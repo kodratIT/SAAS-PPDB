@@ -10,7 +10,12 @@
     "lint:fix": "eslint --fix",
     "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,json,css,md}\"",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "emulator": "firebase emulators:start",
+    "emulator:export": "firebase emulators:export ./firebase-data",
+    "emulator:import": "firebase emulators:start --import=./firebase-data",
+    "firebase:deploy:rules": "firebase deploy --only firestore:rules,storage:rules",
+    "firebase:deploy:indexes": "firebase deploy --only firestore:indexes"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -43,6 +48,7 @@
     "eslint": "^9.37.0",
     "eslint-config-next": "^15.5.5",
     "eslint-config-prettier": "^10.1.8",
+    "firebase-tools": "^14.19.1",
     "postcss": "^8.5.6",
     "prettier": "^3.6.2",
     "prettier-plugin-tailwindcss": "^0.7.0",

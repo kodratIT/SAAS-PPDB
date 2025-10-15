@@ -47,6 +47,7 @@ next-env.d.ts
 serviceAccountKey.json
 *firebase-adminsdk*.json
 public/*firebase*.json
+firebase-data/
 
 # IDEs
 .vscode/*
