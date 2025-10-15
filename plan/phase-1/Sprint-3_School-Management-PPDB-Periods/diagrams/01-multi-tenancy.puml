@@ -1,0 +1,350 @@
+@startuml Multi_Tenancy_Architecture
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Multi-Tenancy Architecture - PPDB SaaS
+
+Person(school_a_admin, "School A Admin", "Administrator Sekolah A")
+Person(school_b_admin, "School B Admin", "Administrator Sekolah B")
+
+Container_Boundary(app, "PPDB SaaS Application") {
+    Container(web_app, "Web Application", "Next.js", "Multi-tenant frontend")
+    Container(api, "API Layer", "Next.js API Routes", "Tenant-aware API")
+    Container(school_context, "School Context", "React Context", "Current tenant state")
+    Container(middleware, "Tenant Middleware", "Next.js Middleware", "Validates tenant access")
+}
+
+System_Boundary(firebase, "Firebase Platform") {
+    ContainerDb(firestore, "Firestore", "NoSQL Database", "Multi-tenant data with schoolId")
+    ContainerDb(storage, "Firebase Storage", "Object Storage", "Isolated per school folder")
+    Container(auth, "Firebase Auth", "Authentication", "User authentication")
+}
+
+Rel(school_a_admin, web_app, "Access School A", "HTTPS")
+Rel(school_b_admin, web_app, "Access School B", "HTTPS")
+
+Rel(web_app, school_context, "Get current school")
+Rel(web_app, middleware, "Protected routes")
+Rel(middleware, auth, "Verify user")
+
+Rel(web_app, api, "Tenant-scoped requests")
+Rel(api, school_context, "Validate tenant")
+Rel(api, firestore, "Query with schoolId filter")
+Rel(api, storage, "Access school folder")
+
+Rel(auth, firestore, "Get user's schoolId")
+
+note right of firestore
+  **Data Structure:**
+  
+  /tenants/{schoolId}
+  - School A data
+  - School B data
+  
+  /ppdb_periods/{periodId}
+  - schoolId: "school-a"
+  - schoolId: "school-b"
+  
+  /applications/{appId}
+  - schoolId: "school-a"
+  
+  **Every document has schoolId!**
+end note
+
+note right of storage
+  **Storage Structure:**
+  
+  /schools/school-a/
+    - logo.jpg
+    - banner.jpg
+    - documents/
+  
+  /schools/school-b/
+    - logo.jpg
+    - banner.jpg
+    - documents/
+  
+  **Complete isolation!**
+end note
+
+SHOW_LEGEND()
+
+@enduml
+
+@startuml Tenant_Isolation_Flow
+
+title Tenant Data Isolation Flow
+
+participant "School A Admin" as admin_a
+participant "Web App" as web
+participant "School Context" as context
+participant "Middleware" as middleware
+participant "API" as api
+participant "Firestore" as db
+
+== Login & Context Setup ==
+
+admin_a -> web: Login
+web -> middleware: Verify auth
+middleware -> db: Get user document
+db -> middleware: { userId, schoolId: "school-a", role: "school_admin" }
+middleware -> context: Set schoolId = "school-a"
+context -> web: School context set
+web -> admin_a: Redirect to dashboard
+
+== Querying Data (Secured) ==
+
+admin_a -> web: View PPDB Periods
+web -> context: Get current schoolId
+context -> web: "school-a"
+web -> api: GET /api/periods
+api -> context: Validate schoolId
+api -> db: Query periods\nWHERE schoolId == "school-a"
+db -> api: [Period 1, Period 2] (only School A's)
+api -> web: Return School A periods
+web -> admin_a: Display periods
+
+== Attempted Cross-Tenant Access (Blocked) ==
+
+admin_a -> web: Try to access\nSchool B's period
+note over web: Manually change URL:\n/api/periods/school-b-period-id
+web -> api: GET /api/periods/school-b-period-id
+api -> context: Get current schoolId
+context -> api: "school-a"
+api -> db: Get period document
+db -> api: { periodId, schoolId: "school-b", ... }
+api -> api: Validate:\nperiod.schoolId != context.schoolId
+api -> web: 403 Forbidden
+web -> admin_a: Access Denied
+
+== Firestore Security Rules (Enforced) ==
+
+note over db
+  **Firestore Rules:**
+  
+  match /ppdb_periods/{periodId} {
+    allow read: if request.auth != null &&
+                   get(/databases/$(database)/documents/users/$(request.auth.uid)).data.schoolId 
+                   == resource.data.schoolId;
+                   
+    allow write: if request.auth != null &&
+                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.schoolId 
+                    == request.resource.data.schoolId;
+  }
+  
+  **Double protection: App logic + Database rules**
+end note
+
+@enduml
+
+@startuml Tenant_Context_Implementation
+
+title School Context Implementation
+
+package "contexts" {
+    class SchoolContext {
+        +currentSchool: School | null
+        +loading: boolean
+        +fetchSchool(schoolId): Promise<School>
+        +refetch(): Promise<void>
+    }
+}
+
+package "hooks" {
+    class useSchool {
+        +school: School
+        +schoolId: string
+        +isSchoolAdmin: boolean
+        +canManage(resource): boolean
+    }
+}
+
+package "middleware" {
+    class TenantMiddleware {
+        +checkTenantAccess(request): Response
+        +validateSchoolId(userId, schoolId): boolean
+        +getSchoolFromSession(request): string
+    }
+}
+
+package "lib/firebase" {
+    class TenantQueries {
+        +queryBySchool<T>(collection, schoolId): T[]
+        +getSchoolDocument<T>(collection, docId, schoolId): T
+        +createSchoolDocument<T>(collection, data, schoolId): string
+        +updateSchoolDocument<T>(collection, docId, data, schoolId): void
+    }
+}
+
+package "api/utils" {
+    class TenantValidator {
+        +validateAccess(userId, schoolId): boolean
+        +getUserSchool(userId): Promise<string>
+        +ensureSameSchool(schoolId1, schoolId2): void
+    }
+}
+
+SchoolContext --> useSchool : provides
+TenantMiddleware --> SchoolContext : sets
+TenantQueries --> TenantValidator : uses
+useSchool --> TenantQueries : calls
+
+note right of SchoolContext
+  **Usage in Components:**
+  
+  const { school, schoolId } = useSchool()
+  
+  // All queries automatically scoped
+  const periods = await queryBySchool('ppdb_periods', schoolId)
+end note
+
+note right of TenantMiddleware
+  **Middleware Protection:**
+  
+  export function middleware(request) {
+    const session = await getSession()
+    const urlSchoolId = request.url.schoolId
+    
+    if (session.schoolId !== urlSchoolId) {
+      return Response.redirect('/unauthorized')
+    }
+    
+    return Response.next()
+  }
+end note
+
+note bottom of TenantQueries
+  **All queries include schoolId:**
+  
+  export async function queryBySchool<T>(
+    collection: string,
+    schoolId: string
+  ) {
+    return getDocs(
+      query(
+        collection(db, collection),
+        where('schoolId', '==', schoolId)
+      )
+    )
+  }
+end note
+
+@enduml
+
+@startuml Multi_Tenant_Database_Schema
+
+title Multi-Tenant Database Schema
+
+entity "tenants (schools)" as schools {
+    * id : string <<PK>>
+    --
+    * name : string
+    * slug : string <<unique>>
+    * schoolId : string <<indexed>>
+    email : string
+    status : enum
+    subscription : {...}
+    createdAt : timestamp
+}
+
+entity "users" as users {
+    * id : string <<PK>>
+    --
+    * email : string
+    * name : string
+    * role : enum
+    **schoolId : string <<FK>>**
+    status : enum
+    createdAt : timestamp
+}
+
+entity "ppdb_periods" as periods {
+    * id : string <<PK>>
+    --
+    **schoolId : string <<FK, indexed>>**
+    * name : string
+    * academicYear : string
+    * status : enum
+    timeline : {...}
+    quotas : {...}
+    createdAt : timestamp
+}
+
+entity "form_configs" as forms {
+    * id : string <<PK>>
+    --
+    **schoolId : string <<FK, indexed>>**
+    * periodId : string <<FK>>
+    * name : string
+    sections : {...}
+    documents : {...}
+    createdAt : timestamp
+}
+
+entity "applications" as applications {
+    * id : string <<PK>>
+    --
+    **schoolId : string <<FK, indexed>>**
+    * periodId : string <<FK>>
+    * userId : string <<FK>>
+    * registrationNumber : string
+    * status : enum
+    formData : {...}
+    createdAt : timestamp
+}
+
+entity "payments" as payments {
+    * id : string <<PK>>
+    --
+    **schoolId : string <<FK, indexed>>**
+    * applicationId : string <<FK>>
+    * userId : string <<FK>>
+    * amount : number
+    * status : enum
+    createdAt : timestamp
+}
+
+schools ||--o{ users : "has admins"
+schools ||--o{ periods : "creates"
+schools ||--o{ forms : "configures"
+schools ||--o{ applications : "receives"
+schools ||--o{ payments : "processes"
+
+periods ||--o{ forms : "has config"
+periods ||--o{ applications : "receives"
+
+applications ||--o| payments : "requires"
+
+note right of schools
+  **Tenant Root**
+  - Main tenant entity
+  - Each school = 1 tenant
+  - Isolated subscription
+end note
+
+note bottom of periods
+  **All tenant-scoped collections**
+  **MUST have schoolId field**
+  
+  Firestore Index:
+  - (schoolId, status, createdAt)
+  - (schoolId, academicYear)
+  
+  Rules:
+  - Read: if user.schoolId == resource.schoolId
+  - Write: if user.schoolId == request.schoolId
+end note
+
+note bottom of applications
+  **Composite Index Required:**
+  
+  applications:
+  - (schoolId, status, createdAt DESC)
+  - (schoolId, periodId, createdAt DESC)
+  - (schoolId, userId, createdAt DESC)
+  
+  **Without schoolId = Table scan = SLOW!**
+end note
+
+@enduml

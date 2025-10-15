@@ -1,0 +1,324 @@
+@startuml Super_Admin_Components
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Super Admin Dashboard - Component Structure
+
+Container_Boundary(super_admin_app, "Super Admin Application") {
+    
+    ' Main Dashboard
+    Component(dashboard, "Dashboard Page", "React Page", "Main dashboard view")
+    Component(layout, "Admin Layout", "Layout Component", "Sidebar, header, content area")
+    
+    ' Dashboard Components
+    Component(stats_overview, "Stats Overview", "Component", "Key metrics display")
+    Component(stats_card, "Stats Card", "Component", "Individual stat widget")
+    Component(chart_widget, "Chart Widget", "Component", "Visual data representation")
+    Component(recent_activities, "Recent Activities", "Component", "Activity feed")
+    Component(quick_actions, "Quick Actions", "Component", "Common action buttons")
+    
+    ' School Management
+    Component(schools_list, "Schools List", "Component", "Table of all schools")
+    Component(school_details, "School Details", "Component", "Individual school view")
+    Component(create_school, "Create School", "Dialog Component", "School creation form")
+    Component(edit_school, "Edit School", "Dialog Component", "School edit form")
+    
+    ' Subscription Management
+    Component(plans_list, "Plans List", "Component", "Subscription plans table")
+    Component(plan_form, "Plan Form", "Component", "Create/edit plan form")
+    Component(plan_card, "Plan Card", "Component", "Plan display card")
+    
+    ' User Management
+    Component(users_list, "Users List", "Component", "All users table")
+    Component(user_details, "User Details", "Component", "User profile view")
+    Component(role_assignment, "Role Assignment", "Component", "Assign roles to users")
+    
+    ' Analytics
+    Component(analytics_dashboard, "Analytics Dashboard", "Component", "System-wide analytics")
+    Component(charts, "Charts", "recharts", "Various chart types")
+    Component(export_data, "Export Data", "Component", "Export functionality")
+    
+    ' Navigation
+    Component(sidebar, "Sidebar", "Component", "Navigation menu")
+    Component(navbar, "Navbar", "Component", "Top navigation bar")
+    Component(breadcrumbs, "Breadcrumbs", "Component", "Current location")
+    
+    ' Common UI
+    Component(data_table, "Data Table", "Component", "Reusable table with sorting, filtering")
+    Component(search_bar, "Search Bar", "Component", "Global search")
+    Component(filters, "Filters", "Component", "Data filtering")
+    Component(pagination, "Pagination", "Component", "Page navigation")
+}
+
+' External Dependencies
+Container(api_routes, "API Routes", "Next.js API")
+ContainerDb(firestore, "Firestore", "Database")
+Component(ui_lib, "shadcn/ui", "UI Library")
+
+' Data Services
+Component(schools_service, "Schools Service", "Service", "School CRUD operations")
+Component(users_service, "Users Service", "Service", "User management")
+Component(plans_service, "Plans Service", "Service", "Subscription plans")
+Component(analytics_service, "Analytics Service", "Service", "Analytics data")
+
+' Dashboard Layout Relationships
+Rel(dashboard, layout, "Wrapped by")
+Rel(layout, sidebar, "Contains")
+Rel(layout, navbar, "Contains")
+
+' Dashboard Component Relationships
+Rel(dashboard, stats_overview, "Renders")
+Rel(dashboard, recent_activities, "Renders")
+Rel(dashboard, quick_actions, "Renders")
+Rel(dashboard, chart_widget, "Renders")
+
+Rel(stats_overview, stats_card, "Composed of")
+Rel(chart_widget, charts, "Uses")
+
+' School Management Relationships
+Rel(schools_list, data_table, "Uses")
+Rel(schools_list, create_school, "Opens")
+Rel(schools_list, school_details, "Navigates to")
+Rel(school_details, edit_school, "Opens")
+
+' Subscription Relationships
+Rel(plans_list, plan_card, "Renders")
+Rel(plans_list, plan_form, "Opens for create/edit")
+
+' User Management Relationships
+Rel(users_list, data_table, "Uses")
+Rel(users_list, user_details, "Navigates to")
+Rel(user_details, role_assignment, "Contains")
+
+' Common UI Relationships
+Rel(data_table, search_bar, "Includes")
+Rel(data_table, filters, "Includes")
+Rel(data_table, pagination, "Includes")
+
+' Service Layer
+Rel(dashboard, analytics_service, "Fetches from")
+Rel(schools_list, schools_service, "Fetches from")
+Rel(users_list, users_service, "Fetches from")
+Rel(plans_list, plans_service, "Fetches from")
+
+Rel(schools_service, api_routes, "Calls")
+Rel(users_service, api_routes, "Calls")
+Rel(plans_service, api_routes, "Calls")
+Rel(analytics_service, api_routes, "Calls")
+
+Rel(api_routes, firestore, "Reads/Writes")
+
+' UI Library
+Rel(stats_card, ui_lib, "Uses Button, Card")
+Rel(data_table, ui_lib, "Uses Table")
+Rel(plan_form, ui_lib, "Uses Input, Select, Button")
+
+SHOW_LEGEND()
+
+@enduml
+
+@startuml Super_Admin_Dashboard_Layout
+
+title Super Admin Dashboard Layout
+
+skinparam rectangle {
+    BackgroundColor<<header>> #3498db
+    BackgroundColor<<sidebar>> #2c3e50
+    BackgroundColor<<content>> #ecf0f1
+    BackgroundColor<<card>> #ffffff
+}
+
+rectangle "Browser Window" {
+    rectangle "Header / Navbar" as header <<header>> {
+        [Logo] as logo
+        [Search Bar] as search
+        [Notifications] as notif
+        [User Menu] as user_menu
+    }
+    
+    rectangle "Main Container" {
+        rectangle "Sidebar" as sidebar <<sidebar>> {
+            [Dashboard] as nav_dashboard
+            [Schools] as nav_schools
+            [Subscriptions] as nav_subs
+            [Users] as nav_users
+            [Analytics] as nav_analytics
+            [Settings] as nav_settings
+        }
+        
+        rectangle "Content Area" as content <<content>> {
+            rectangle "Breadcrumbs" as breadcrumbs
+            
+            rectangle "Page Title & Actions" {
+                [Dashboard] as title
+                [Export] as export_btn
+                [Refresh] as refresh_btn
+            }
+            
+            rectangle "Stats Row" {
+                rectangle "Total Schools" as stat1 <<card>> {
+                    [250]
+                    [+12% this month]
+                }
+                rectangle "Active Users" as stat2 <<card>> {
+                    [15,234]
+                    [+5.2% this month]
+                }
+                rectangle "Total Revenue" as stat3 <<card>> {
+                    [Rp 125M]
+                    [+8.1% this month]
+                }
+                rectangle "Active Periods" as stat4 <<card>> {
+                    [85]
+                    [Ongoing PPDB]
+                }
+            }
+            
+            rectangle "Charts Row" {
+                rectangle "Revenue Chart" as chart1 <<card>> {
+                    [Line Chart]
+                    [Last 12 months]
+                }
+                rectangle "School Growth" as chart2 <<card>> {
+                    [Bar Chart]
+                    [New schools/month]
+                }
+            }
+            
+            rectangle "Recent Activities" as activities <<card>> {
+                [Activity 1: New school registered]
+                [Activity 2: User upgraded plan]
+                [Activity 3: PPDB period started]
+                [Activity 4: Payment processed]
+                [View All]
+            }
+        }
+    }
+}
+
+logo -down-> search
+search -down-> notif
+notif -down-> user_menu
+
+nav_dashboard -down-> nav_schools
+nav_schools -down-> nav_subs
+nav_subs -down-> nav_users
+nav_users -down-> nav_analytics
+nav_analytics -down-> nav_settings
+
+sidebar -right-> content
+
+stat1 -right-> stat2
+stat2 -right-> stat3
+stat3 -right-> stat4
+
+chart1 -right-> chart2
+
+note right of sidebar
+  **Sidebar Navigation**
+  - Always visible
+  - Collapsible on mobile
+  - Active route highlighted
+  - Role-based menu items
+end note
+
+note bottom of stat1
+  **Stats Cards**
+  - Real-time data
+  - Comparison with previous period
+  - Trend indicators (↑/↓)
+  - Click to view details
+end note
+
+note bottom of chart1
+  **Charts**
+  - Interactive (hover for details)
+  - Responsive design
+  - Export as image/PDF
+  - Date range selector
+end note
+
+note bottom of activities
+  **Activity Feed**
+  - Real-time updates
+  - Filterable by type
+  - Pagination
+  - Link to detail pages
+end note
+
+@enduml
+
+@startuml Super_Admin_State_Flow
+
+title Super Admin User Flow
+
+[*] --> Login
+Login --> VerifyRole: Login Success
+
+VerifyRole --> Dashboard: Role = super_admin
+VerifyRole --> Unauthorized: Role != super_admin
+
+Dashboard --> ViewSchools: Click "Schools"
+Dashboard --> ViewPlans: Click "Subscriptions"
+Dashboard --> ViewUsers: Click "Users"
+Dashboard --> ViewAnalytics: Click "Analytics"
+
+ViewSchools --> SchoolDetails: Click school
+ViewSchools --> CreateSchool: Click "Create"
+SchoolDetails --> EditSchool: Click "Edit"
+SchoolDetails --> DeleteSchool: Click "Delete"
+
+CreateSchool --> ViewSchools: Save Success
+EditSchool --> ViewSchools: Update Success
+DeleteSchool --> ViewSchools: Delete Success
+
+ViewPlans --> CreatePlan: Click "Create"
+ViewPlans --> EditPlan: Click plan
+CreatePlan --> ViewPlans: Save Success
+EditPlan --> ViewPlans: Update Success
+
+ViewUsers --> UserDetails: Click user
+UserDetails --> AssignRole: Click "Change Role"
+AssignRole --> UserDetails: Role Updated
+
+ViewAnalytics --> ExportData: Click "Export"
+ExportData --> ViewAnalytics: Download Complete
+
+Dashboard --> Logout: Click logout
+ViewSchools --> Logout
+ViewPlans --> Logout
+ViewUsers --> Logout
+ViewAnalytics --> Logout
+
+Logout --> [*]
+Unauthorized --> [*]
+
+note right of Dashboard
+  **Dashboard Features**
+  - Overview statistics
+  - Quick actions
+  - Recent activities
+  - Charts & graphs
+  - System health
+end note
+
+note right of ViewSchools
+  **School Management**
+  - List all schools
+  - Search & filter
+  - View details
+  - Edit/delete
+  - Subscription status
+end note
+
+note right of ViewPlans
+  **Plan Management**
+  - List subscription plans
+  - Create/edit/delete
+  - Set pricing
+  - Define features
+  - Active/inactive status
+end note
+
+@enduml

@@ -1,0 +1,139 @@
+@startuml PPDB_SaaS_Component_Diagram
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Component Diagram - Sprint 1 Project Structure
+
+Container_Boundary(nextjs_app, "Next.js Application") {
+    
+    Component(app_router, "App Router", "Next.js 14", "File-based routing")
+    
+    ' Route Groups
+    Component(auth_routes, "(auth) Routes", "Pages", "Login, Register, Forgot Password")
+    Component(admin_routes, "(super-admin) Routes", "Pages", "Dashboard, Schools, Subscriptions")
+    Component(school_routes, "(school-admin) Routes", "Pages", "PPDB Management")
+    Component(student_routes, "(student) Routes", "Pages", "Application Portal")
+    Component(public_routes, "(public) Routes", "Pages", "Landing Pages")
+    
+    ' API Layer
+    Component(auth_api, "/api/auth", "API", "Authentication APIs")
+    Component(schools_api, "/api/schools", "API", "School CRUD")
+    Component(periods_api, "/api/periods", "API", "Period management")
+    Component(applications_api, "/api/applications", "API", "Student applications")
+    Component(payments_api, "/api/payments", "API", "Payment processing")
+    Component(upload_api, "/api/upload", "API", "File upload")
+    
+    ' Components
+    Component(ui_components, "UI Components", "shadcn/ui", "Reusable components")
+    Component(layout_components, "Layout Components", "React", "Header, Sidebar, Footer")
+    Component(auth_components, "Auth Components", "React", "Login/Register forms")
+    Component(dashboard_components, "Dashboard Components", "React", "Stats, Charts")
+    Component(form_components, "Form Components", "React", "Dynamic forms")
+    
+    ' Firebase Layer
+    Component(firebase_config, "Firebase Config", "Client SDK", "Client-side init")
+    Component(firebase_admin, "Firebase Admin", "Admin SDK", "Server-side operations")
+    Component(firestore_helpers, "Firestore Helpers", "Library", "CRUD operations")
+    
+    ' Collection Helpers
+    Component(schools_helper, "Schools Helper", "Library", "School operations")
+    Component(users_helper, "Users Helper", "Library", "User operations")
+    Component(periods_helper, "Periods Helper", "Library", "Period operations")
+    Component(applications_helper, "Applications Helper", "Library", "Application operations")
+    
+    ' Utilities
+    Component(auth_utils, "Auth Utilities", "Utils", "Token validation")
+    Component(validation, "Validation", "Zod", "Schema validation")
+    
+    ' State Management
+    Component(auth_context, "Auth Context", "React Context", "Global auth state")
+    Component(tenant_context, "Tenant Context", "React Context", "Multi-tenant state")
+    Component(theme_context, "Theme Context", "React Context", "Theme state")
+    
+    ' Custom Hooks
+    Component(use_auth, "useAuth", "Hook", "Authentication hook")
+    Component(use_tenant, "useTenant", "Hook", "Tenant hook")
+    Component(use_firestore, "useFirestore", "Hook", "Data fetching")
+    
+    ' Types
+    Component(database_types, "Database Types", "TypeScript", "Firestore interfaces")
+    Component(api_types, "API Types", "TypeScript", "API types")
+    Component(component_types, "Component Types", "TypeScript", "Props types")
+}
+
+ContainerDb(firestore, "Cloud Firestore", "Firebase", "NoSQL database")
+Container(firebase_auth, "Firebase Auth", "Firebase", "Authentication")
+ContainerDb(firebase_storage, "Firebase Storage", "Firebase", "File storage")
+
+' Router to Routes
+Rel(app_router, auth_routes, "Renders")
+Rel(app_router, admin_routes, "Renders")
+Rel(app_router, school_routes, "Renders")
+Rel(app_router, student_routes, "Renders")
+Rel(app_router, public_routes, "Renders")
+
+' Routes to Components
+Rel(auth_routes, auth_components, "Uses")
+Rel(admin_routes, dashboard_components, "Uses")
+Rel(school_routes, form_components, "Uses")
+Rel(student_routes, form_components, "Uses")
+
+' Components to UI
+Rel(auth_components, ui_components, "Uses")
+Rel(dashboard_components, ui_components, "Uses")
+Rel(form_components, ui_components, "Uses")
+Rel(layout_components, ui_components, "Uses")
+
+' Routes to API
+Rel(auth_routes, auth_api, "Calls")
+Rel(admin_routes, schools_api, "Calls")
+Rel(school_routes, periods_api, "Calls")
+Rel(student_routes, applications_api, "Calls")
+
+' API to Helpers
+Rel(auth_api, firebase_admin, "Uses")
+Rel(schools_api, schools_helper, "Uses")
+Rel(periods_api, periods_helper, "Uses")
+Rel(applications_api, applications_helper, "Uses")
+Rel(payments_api, firebase_admin, "Uses")
+Rel(upload_api, firebase_storage, "Uses")
+
+' Helpers to Firestore Helpers
+Rel(schools_helper, firestore_helpers, "Extends")
+Rel(users_helper, firestore_helpers, "Extends")
+Rel(periods_helper, firestore_helpers, "Extends")
+Rel(applications_helper, firestore_helpers, "Extends")
+
+' Firebase Config
+Rel(firebase_config, firestore, "Connects")
+Rel(firebase_config, firebase_auth, "Connects")
+Rel(firebase_config, firebase_storage, "Connects")
+
+Rel(firebase_admin, firestore, "Admin Access")
+Rel(firebase_admin, firebase_auth, "Admin Access")
+
+Rel(firestore_helpers, firebase_config, "Uses")
+
+' State Management
+Rel(auth_context, firebase_auth, "Manages")
+Rel(tenant_context, firestore, "Fetches")
+
+' Hooks
+Rel(use_auth, auth_context, "Accesses")
+Rel(use_tenant, tenant_context, "Accesses")
+Rel(use_firestore, firestore, "Queries")
+
+' Components use Hooks
+Rel(auth_components, use_auth, "Uses")
+Rel(dashboard_components, use_tenant, "Uses")
+Rel(form_components, use_firestore, "Uses")
+
+' Types
+Rel(firestore_helpers, database_types, "Uses")
+Rel(auth_api, api_types, "Uses")
+Rel(ui_components, component_types, "Uses")
+
+SHOW_LEGEND()
+
+@enduml

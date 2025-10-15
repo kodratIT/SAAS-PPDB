@@ -1,0 +1,430 @@
+@startuml PPDB_Period_Configuration
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title PPDB Period Configuration - Components
+
+Container_Boundary(period_management, "PPDB Period Management") {
+    
+    ' Main Pages
+    Component(period_list, "Period List", "Page", "List all PPDB periods")
+    Component(create_period, "Create Period", "Page", "New period wizard")
+    Component(edit_period, "Edit Period", "Page", "Edit existing period")
+    Component(period_detail, "Period Detail", "Page", "View period details")
+    
+    ' Form Components
+    Component(basic_info_form, "Basic Info Form", "Component", "Name, academic year, batch")
+    Component(timeline_config, "Timeline Config", "Component", "Registration dates & deadlines")
+    Component(quota_config, "Quota Config", "Component", "Set quotas per jalur")
+    Component(jalur_config, "Jalur Config", "Component", "Configure jalur pendaftaran")
+    Component(fee_config, "Fee Config", "Component", "Registration & reregistration fees")
+    
+    ' Timeline Components
+    Component(date_range_picker, "Date Range Picker", "Component", "Start-end date selection")
+    Component(timeline_visualizer, "Timeline Visualizer", "Component", "Visual timeline")
+    Component(date_validator, "Date Validator", "Utility", "Validate date consistency")
+    
+    ' Quota Components
+    Component(quota_calculator, "Quota Calculator", "Component", "Calculate total quota")
+    Component(quota_chart, "Quota Chart", "Component", "Visual quota distribution")
+    Component(jalur_quota_input, "Jalur Quota Input", "Component", "Input per jalur")
+    
+    ' Status Management
+    Component(period_status, "Period Status", "Component", "Draft/Active/Closed/Archived")
+    Component(status_actions, "Status Actions", "Component", "Activate/Close/Archive")
+    
+    ' Jalur Management
+    Component(jalur_list, "Jalur List", "Component", "List of jalur")
+    Component(jalur_form, "Jalur Form", "Component", "Create/edit jalur")
+    Component(jalur_criteria, "Jalur Criteria", "Component", "Define selection criteria")
+}
+
+Container(api, "API", "Next.js API")
+ContainerDb(firestore, "Firestore", "Database")
+
+' Relationships - Create Period Flow
+Rel(period_list, create_period, "Navigate to")
+Rel(create_period, basic_info_form, "Step 1")
+Rel(create_period, timeline_config, "Step 2")
+Rel(create_period, quota_config, "Step 3")
+Rel(create_period, jalur_config, "Step 4")
+Rel(create_period, fee_config, "Step 5")
+
+' Timeline Relationships
+Rel(timeline_config, date_range_picker, "Uses")
+Rel(timeline_config, timeline_visualizer, "Shows")
+Rel(timeline_config, date_validator, "Validates")
+
+' Quota Relationships
+Rel(quota_config, jalur_quota_input, "Contains")
+Rel(quota_config, quota_calculator, "Uses")
+Rel(quota_config, quota_chart, "Displays")
+
+' Jalur Relationships
+Rel(jalur_config, jalur_list, "Shows")
+Rel(jalur_config, jalur_form, "Opens")
+Rel(jalur_form, jalur_criteria, "Configures")
+
+' Status Management
+Rel(period_detail, period_status, "Shows")
+Rel(period_detail, status_actions, "Contains")
+
+' API Interactions
+Rel(create_period, api, "POST /api/periods")
+Rel(edit_period, api, "PUT /api/periods/{id}")
+Rel(period_list, api, "GET /api/periods")
+Rel(status_actions, api, "PATCH /api/periods/{id}/status")
+
+Rel(api, firestore, "CRUD operations")
+
+SHOW_LEGEND()
+
+@enduml
+
+@startuml Period_Creation_Flow
+
+title PPDB Period Creation Flow
+
+actor "School Admin" as admin
+participant "Period List" as list
+participant "Create Form" as form
+participant "Timeline Config" as timeline
+participant "Quota Config" as quota
+participant "API" as api
+database "Firestore" as db
+
+== Start Creation ==
+
+admin -> list: Click "Create New Period"
+list -> form: Navigate to create page
+form -> admin: Show basic info form
+
+== Step 1: Basic Information ==
+
+admin -> form: Fill basic info:\n- Name: "PPDB 2024/2025"\n- Academic Year: "2024/2025"\n- Batch: 1
+form -> form: Validate required fields
+form -> admin: Enable "Next" button
+
+admin -> form: Click "Next"
+form -> timeline: Navigate to timeline config
+
+== Step 2: Timeline Configuration ==
+
+timeline -> admin: Show timeline form
+
+admin -> timeline: Set registration start:\n2024-06-01
+admin -> timeline: Set registration end:\n2024-06-30
+timeline -> timeline: Validate: end > start
+timeline -> admin: ✓ Valid
+
+admin -> timeline: Set edit deadline:\n2024-06-25
+admin -> timeline: Set document deadline:\n2024-06-28
+timeline -> timeline: Validate timeline order
+timeline -> timeline: registration_start <\nregistration_end <\nedit_deadline <\ndocument_deadline <\nannouncement_date
+
+alt Timeline valid
+    timeline -> admin: Show timeline visual
+else Timeline invalid
+    timeline -> admin: Show error:\n"Dates must be in order"
+    admin -> timeline: Fix dates
+end
+
+admin -> timeline: Set announcement date:\n2024-07-15
+admin -> timeline: Set reregistration dates:\n2024-07-20 to 2024-07-25
+
+timeline -> admin: Timeline configured
+admin -> timeline: Click "Next"
+timeline -> quota: Navigate to quota config
+
+== Step 3: Quota Configuration ==
+
+quota -> admin: Show quota form
+
+admin -> quota: Set total quota: 360
+admin -> quota: Set per jalur:\n- Prestasi: 36 (10%)\n- Zonasi: 216 (60%)\n- Umum: 90 (25%)\n- Afirmasi: 18 (5%)
+
+quota -> quota: Calculate total: 36+216+90+18 = 360
+quota -> quota: Validate: sum == total quota
+
+alt Quota valid
+    quota -> admin: Show quota chart\n(pie chart)
+else Quota invalid
+    quota -> admin: Error: "Sum must equal total"
+    admin -> quota: Adjust quotas
+end
+
+admin -> quota: Click "Next"
+
+== Step 4: Jalur Configuration ==
+
+form -> admin: Show jalur config
+
+admin -> form: Configure "Jalur Prestasi":\n- Quota: 36\n- Criteria: Academic + Achievement\n- Min score: 85
+
+admin -> form: Configure "Jalur Zonasi":\n- Quota: 216\n- Criteria: Distance from school\n- Max distance: 3 km
+
+admin -> form: Click "Next"
+
+== Step 5: Fees ==
+
+form -> admin: Show fee config
+
+admin -> form: Set registration fee:\nRp 100,000
+
+admin -> form: Set reregistration fee:\nRp 5,000,000
+
+admin -> form: Select payment methods:\n☑ Bank Transfer\n☑ Virtual Account\n☑ E-wallet
+
+admin -> form: Set payment deadline:\n3 days after registration
+
+== Review & Submit ==
+
+form -> admin: Show summary:\n- Basic info ✓\n- Timeline ✓\n- Quota ✓\n- Jalur ✓\n- Fees ✓
+
+admin -> form: Click "Create Period"
+form -> form: Validate all data
+
+form -> api: POST /api/periods\n{periodData}
+
+api -> api: Validate:\n- schoolId matches user\n- No overlapping periods\n- Timeline is valid\n- Quotas sum correctly
+
+api -> db: Create ppdb_periods document
+db -> api: Document created (periodId)
+
+api -> db: Create related:\n- jalur documents\n- quota allocations
+
+api -> form: Period created successfully
+
+form -> list: Redirect to period list
+list -> admin: Show new period\nStatus: Draft
+
+note right of api
+  **Created Documents:**
+  
+  /ppdb_periods/{periodId}
+  - Basic info
+  - Timeline
+  - Total quota
+  - Status: draft
+  - schoolId
+  
+  /jalur_pendaftaran (subcollection)
+  - One doc per jalur
+  - Criteria
+  - Individual quota
+  
+  **Validation Rules:**
+  1. Timeline order correct
+  2. Quotas sum to total
+  3. No date conflicts
+  4. School has active subscription
+end note
+
+@enduml
+
+@startuml Period_Status_Management
+
+title PPDB Period Status Management & Lifecycle
+
+state "Draft" as draft
+state "Active" as active
+state "Closed" as closed
+state "Archived" as archived
+
+[*] --> draft : Create period
+
+draft --> active : Activate\n(admin action)
+draft --> archived : Delete/Archive\n(unused period)
+
+active --> closed : Auto-close on\nregistration end date
+active --> closed : Manual close\n(admin action)
+
+closed --> archived : Archive after\n30 days
+
+archived --> [*]
+
+note right of draft
+  **Draft Status:**
+  - Can edit all fields
+  - Not visible to students
+  - No applications accepted
+  
+  **Actions:**
+  - Edit
+  - Delete
+  - Activate
+end note
+
+note right of active
+  **Active Status:**
+  - Visible to students
+  - Accepting applications
+  - Limited editing:
+    ✓ Quota (increase only)
+    ✓ Fees
+    ✗ Timeline dates
+    ✗ Jalur criteria
+  
+  **Auto Actions:**
+  - Close on registration_end
+  - Email reminders
+  
+  **Manual Actions:**
+  - Close early (emergency)
+  - Extend deadline (1x max)
+end note
+
+note right of closed
+  **Closed Status:**
+  - No new applications
+  - Processing applications
+  - Verification active
+  - Selection in progress
+  
+  **Actions:**
+  - View only
+  - Generate reports
+  - Publish results
+  - Archive when done
+end note
+
+note right of archived
+  **Archived Status:**
+  - Read-only
+  - Historical data
+  - Reporting only
+  
+  **Retention:**
+  - Kept for 3 years
+  - Then soft-deleted
+end note
+
+@enduml
+
+@startuml Period_Timeline_Validation
+
+title PPDB Period Timeline Validation Rules
+
+package "Timeline Dates" {
+    rectangle "Registration Start" as reg_start #lightblue
+    rectangle "Registration End" as reg_end #lightblue
+    rectangle "Edit Deadline" as edit_deadline #lightyellow
+    rectangle "Document Deadline" as doc_deadline #lightyellow
+    rectangle "Verification Start" as verify_start #lightgreen
+    rectangle "Verification End" as verify_end #lightgreen
+    rectangle "Test Date (optional)" as test_date #lightcoral
+    rectangle "Announcement Date" as announce_date #lightpink
+    rectangle "Reregistration Start" as rereg_start #lavender
+    rectangle "Reregistration End" as rereg_end #lavender
+}
+
+reg_start -down-> reg_end : must be before
+reg_end -down-> edit_deadline : must be before
+edit_deadline -down-> doc_deadline : must be before
+doc_deadline -down-> verify_start : must be before
+verify_start -down-> verify_end : must be before
+verify_end -down-> announce_date : must be before
+announce_date -down-> rereg_start : must be before
+rereg_start -down-> rereg_end : must be before
+
+note right of reg_start
+  **Validation Rules:**
+  
+  1. registration_start > today
+  2. registration_end > registration_start
+  3. edit_deadline <= registration_end
+  4. document_deadline > edit_deadline
+  5. verification_start >= document_deadline
+  6. verification_end > verification_start
+  7. test_date between verification_start and verification_end
+  8. announcement_date > verification_end
+  9. reregistration_start >= announcement_date
+  10. reregistration_end > reregistration_start
+  
+  **Recommended Gaps:**
+  - Registration period: 14-30 days
+  - Edit deadline: 5 days before registration_end
+  - Document deadline: 2 days after registration_end
+  - Verification period: 7-14 days
+  - Gap to announcement: 1-3 days
+  - Reregistration period: 5-7 days
+end note
+
+note bottom of doc_deadline
+  **Business Logic:**
+  
+  - Students can register: registration_start to registration_end
+  - Students can edit: registration_start to edit_deadline
+  - Students must upload docs: by document_deadline
+  - Admin verifies: verification_start to verification_end
+  - Results published: on announcement_date
+  - Winners reregister: reregistration_start to reregistration_end
+end note
+
+@enduml
+
+@startuml Quota_Distribution
+
+title Quota Distribution & Management
+
+rectangle "Total Quota: 360" as total #lightblue {
+    rectangle "Jalur Prestasi\n36 siswa (10%)" as prestasi #lightgreen
+    rectangle "Jalur Zonasi\n216 siswa (60%)" as zonasi #lightyellow
+    rectangle "Jalur Umum\n90 siswa (25%)" as umum #lightcoral
+    rectangle "Jalur Afirmasi\n18 siswa (5%)" as afirmasi #lavender
+}
+
+total --> prestasi
+total --> zonasi
+total --> umum
+total --> afirmasi
+
+note right of total
+  **Quota Rules:**
+  
+  1. Sum of all jalur == Total
+  2. Each jalur >= 1
+  3. Percentages configurable
+  4. Can adjust during draft
+  5. Can increase (not decrease) when active
+  
+  **Validation:**
+  - prestasi + zonasi + umum + afirmasi = 360
+  - No jalur with 0 quota (delete instead)
+end note
+
+note bottom of prestasi
+  **Jalur Prestasi:**
+  - Based on academic achievement
+  - Requires certificates
+  - Scoring: grades + achievements
+  - Min average: 85
+end note
+
+note bottom of zonasi
+  **Jalur Zonasi:**
+  - Based on proximity
+  - Max distance: 3 km
+  - Verified by address
+  - Priority: nearest first
+end note
+
+note bottom of umum
+  **Jalur Umum:**
+  - Open to all
+  - Based on test scores
+  - First come first served
+  - or highest score
+end note
+
+note bottom of afirmasi
+  **Jalur Afirmasi:**
+  - For underprivileged
+  - Requires proof (KIP, PKH)
+  - Special consideration
+  - Quota reserved
+end note
+
+@enduml

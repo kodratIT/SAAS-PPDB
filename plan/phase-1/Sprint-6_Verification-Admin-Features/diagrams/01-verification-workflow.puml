@@ -1,0 +1,183 @@
+@startuml verification-workflow
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+title Application Verification Workflow - Sprint 6
+
+' === SUB-DIAGRAM 1: Complete Verification Process ===
+participant "School Admin" as Admin
+participant "Verification\nUI" as UI
+participant "API" as API
+participant "Firestore" as DB
+participant "Email\nService" as Email
+participant "Student" as Student
+
+== Step 1: Admin Reviews Applications ==
+Admin -> UI: Navigate to Verification page
+UI -> API: GET /api/admin/applications?status=submitted
+API -> DB: Query applications\nWHERE status = 'submitted'
+DB --> API: List of pending applications
+API --> UI: Applications data
+UI --> Admin: Display pending list
+
+Admin -> UI: Click on application
+UI -> API: GET /api/applications/{id}
+API -> DB: Get application details
+DB --> API: Application data + documents
+API --> UI: Full application data
+UI --> Admin: Show application detail
+
+== Step 2: Document Review ==
+Admin -> UI: View each document
+UI --> Admin: Display PDF/images
+
+Admin -> UI: Add review comment
+UI --> UI: Store comment locally
+
+== Step 3: Approval Decision ==
+alt Approve Application
+  Admin -> UI: Click "Approve"
+  UI -> API: POST /api/admin/verify\n{approved: true, comment}
+  
+  API -> DB: Update application\nstatus = 'approved'
+  API -> DB: Save verification data\n{verifiedBy, verifiedAt, comment}
+  
+  API -> Email: Send approval email
+  Email -> Student: "Selamat! Pendaftaran Anda diterima"
+  
+  API --> UI: Success response
+  UI --> Admin: "Application approved"
+  
+else Reject Application
+  Admin -> UI: Click "Reject"
+  Admin -> UI: Enter rejection reason
+  
+  UI -> API: POST /api/admin/verify\n{approved: false, comment}
+  
+  API -> DB: Update application\nstatus = 'rejected'
+  API -> DB: Save rejection reason
+  
+  API -> Email: Send rejection email
+  Email -> Student: "Pendaftaran ditolak:\n{reason}"
+  
+  API --> UI: Success response
+  UI --> Admin: "Application rejected"
+end
+
+@enduml
+
+'===============================================
+' SUB-DIAGRAM 2: Bulk Verification Flow
+'===============================================
+@startuml bulk-verification
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+title Bulk Verification Process
+
+participant "Admin" as Admin
+participant "UI" as UI
+participant "API" as API
+participant "Queue" as Queue
+participant "Worker" as Worker
+participant "DB" as DB
+
+Admin -> UI: Select multiple applications
+Admin -> UI: Click "Bulk Approve"
+
+UI -> API: POST /api/admin/bulk-verify\n{applicationIds, approved: true}
+
+API -> Queue: Add verification jobs
+loop For each application
+  Queue -> Worker: Process verification
+  Worker -> DB: Update application status
+  Worker -> Worker: Send notification email
+  Worker --> Queue: Job complete
+end
+
+Queue --> API: All jobs complete
+
+API --> UI: Success: {processed: 10, failed: 0}
+UI --> Admin: "10 applications approved"
+
+@enduml
+
+'===============================================
+' SUB-DIAGRAM 3: Verification UI Components
+'===============================================
+@startuml verification-ui
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Verification Interface Components
+
+Container_Boundary(ui, "Verification UI") {
+  Component(list, "VerificationList", "Component", "List with filters & search")
+  Component(card, "ApplicationCard", "Component", "Application summary card")
+  Component(detail, "ApplicationDetail", "Component", "Full application view")
+  Component(docs, "DocumentViewer", "Component", "View PDF/images")
+  Component(actions, "ApprovalActions", "Component", "Approve/reject buttons")
+  Component(comments, "CommentsSection", "Component", "Add review comments")
+}
+
+Container_Boundary(api, "Backend API") {
+  Component(get_apps, "GET /applications", "Endpoint", "List applications")
+  Component(get_app, "GET /applications/:id", "Endpoint", "Get application")
+  Component(verify, "POST /admin/verify", "Endpoint", "Approve/reject")
+}
+
+Container(db, "Firestore", "Database")
+
+Rel(list, card, "contains")
+Rel(card, detail, "opens")
+Rel(detail, docs, "shows")
+Rel(detail, comments, "shows")
+Rel(detail, actions, "shows")
+
+Rel(list, get_apps, "fetches from")
+Rel(detail, get_app, "fetches from")
+Rel(actions, verify, "calls")
+Rel(verify, db, "updates")
+
+@enduml
+
+'===============================================
+' SUB-DIAGRAM 4: Verification Status Flow
+'===============================================
+@startuml status-flow
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+title Application Status State Machine
+
+[*] --> Draft : Student starts
+Draft --> Submitted : Student submits
+
+Submitted --> UnderReview : Admin opens
+UnderReview --> Submitted : Admin navigates away
+
+UnderReview --> Approved : Admin approves
+UnderReview --> Rejected : Admin rejects
+
+Approved --> [*]
+Rejected --> [*]
+
+note right of Submitted
+  Waiting for admin review
+  Editable by student
+end note
+
+note right of UnderReview
+  Admin is reviewing
+  Locked for editing
+end note
+
+note right of Approved
+  Application accepted
+  Student notified
+  Can proceed to enrollment
+end note
+
+note right of Rejected
+  Application denied
+  Reason provided
+  Student can reapply
+end note
+
+@enduml

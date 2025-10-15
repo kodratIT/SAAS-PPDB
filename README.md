@@ -1,36 +1,176 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PPDB SaaS - Sistem Penerimaan Peserta Didik Baru
 
-## Getting Started
+Platform SaaS multi-tenant untuk membantu sekolah mengelola proses pendaftaran siswa baru secara online.
 
-First, run the development server:
+## 🚀 Tech Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Framework**: Next.js 15 (App Router)
+- **Language**: TypeScript 5+
+- **Database**: Firebase (Firestore, Auth, Storage)
+- **Styling**: Tailwind CSS 3+
+- **UI Components**: shadcn/ui
+- **State Management**: Zustand + React Query
+- **Forms**: React Hook Form + Zod
+- **Code Quality**: ESLint + Prettier
+
+## 📋 Prerequisites
+
+- Node.js 18.x or 20.x LTS
+- npm 9.x or 10.x
+- Git 2.x+
+- Firebase account
+- Vercel account (for deployment)
+
+## 🛠️ Getting Started
+
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Setup environment variables**:
+   ```bash
+   cp .env.example .env.local
+   ```
+   
+   Then configure your Firebase credentials in `.env.local`
+
+3. **Run development server**:
+   ```bash
+   npm run dev
+   ```
+
+4. **Open in browser**: [http://localhost:3000](http://localhost:3000)
+
+## 📁 Project Structure
+
+```
+ppdb/
+├── src/
+│   ├── app/                      # Next.js App Router
+│   │   ├── (auth)/              # Authentication routes
+│   │   ├── (super-admin)/       # Super admin routes
+│   │   ├── (school-admin)/      # School admin routes
+│   │   ├── (panitia)/           # Panitia routes
+│   │   ├── (student)/           # Student routes
+│   │   ├── (public)/            # Public routes
+│   │   └── api/                 # API routes
+│   ├── components/
+│   │   ├── ui/                  # shadcn/ui components
+│   │   ├── layout/              # Layout components
+│   │   ├── auth/                # Auth components
+│   │   └── shared/              # Shared components
+│   ├── lib/
+│   │   ├── firebase/            # Firebase configuration
+│   │   ├── api/                 # API utilities
+│   │   └── utils/               # Utility functions
+│   ├── hooks/                   # Custom React hooks
+│   ├── store/                   # State management
+│   ├── types/                   # TypeScript types
+│   └── config/                  # App configuration
+├── firebase/                    # Firebase config files
+├── tests/                       # Test files
+└── public/                      # Static assets
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🔧 Development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Available Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `npm run dev` - Start development server (with Turbopack)
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+- `npm run lint:fix` - Fix ESLint errors
+- `npm run format` - Format code with Prettier
+- `npm run format:check` - Check code formatting
+- `npm run type-check` - Run TypeScript type checking
 
-## Learn More
+### Code Quality
 
-To learn more about Next.js, take a look at the following resources:
+This project uses ESLint and Prettier to maintain code quality:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+# Check code quality
+npm run lint
+npm run format:check
+npm run type-check
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Fix issues
+npm run lint:fix
+npm run format
+```
 
-## Deploy on Vercel
+## 🏗️ Architecture
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Multi-Tenancy
+- Database-per-tenant approach with Firestore
+- Tenant identification via `schoolId`
+- URL routing: `app.ppdb.com/{schoolSlug}`
+- Data isolation with Firestore Security Rules
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### User Roles
+1. **Super Admin** - Platform owner with full access
+2. **School Admin** - School management
+3. **Panitia PPDB** - Verification and scoring
+4. **Student/Parent** - Registration and tracking
+
+## 📚 Documentation
+
+- [Complete Specification](./plan/PPDB_SAAS_COMPLETE_SPEC.md)
+- [Phase 1 Tasks](./plan/PHASE_1_DETAILED_TASKS.md)
+- [Sprint Documentation](./plan/phase-1/)
+
+## 🚀 Deployment
+
+### Vercel (Recommended)
+```bash
+# Deploy to production
+vercel --prod
+
+# Deploy to preview
+vercel
+```
+
+### Firebase
+```bash
+# Deploy Firestore rules
+firebase deploy --only firestore:rules
+
+# Deploy Storage rules
+firebase deploy --only storage:rules
+```
+
+## 🧪 Testing
+
+```bash
+# Run unit tests
+npm run test
+
+# Run e2e tests
+npm run test:e2e
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+## 📄 License
+
+This project is private and proprietary.
+
+## 👥 Team
+
+- Tech Lead: [TBD]
+- Full Stack Developers: [TBD]
+- DevOps: [TBD]
+- QA: [TBD]
+
+## 📝 Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for version history.
+
+---
+
+**Status**: 🚧 Sprint 1 - In Progress  
+**Version**: 0.1.0  
+**Last Updated**: 2024-10-15

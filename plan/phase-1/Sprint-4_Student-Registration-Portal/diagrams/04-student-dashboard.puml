@@ -1,0 +1,388 @@
+@startuml Student_Dashboard_Components
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Student Dashboard - Component Structure
+
+Container_Boundary(dashboard_app, "Student Dashboard") {
+    
+    ' Main Dashboard
+    Component(dashboard_page, "Dashboard Page", "React Page", "Main dashboard view")
+    Component(dashboard_layout, "Dashboard Layout", "Layout", "Header + sidebar + content")
+    
+    ' Application Components
+    Component(application_card, "Application Card", "Component", "Application summary display")
+    Component(status_badge, "Status Badge", "Component", "Visual status indicator")
+    Component(registration_number, "Registration Number", "Component", "Display reg number")
+    
+    ' Timeline Components
+    Component(timeline_tracker, "Timeline Tracker", "Component", "Visual progress timeline")
+    Component(timeline_step, "Timeline Step", "Component", "Individual step in timeline")
+    Component(progress_bar, "Progress Bar", "Component", "Overall progress indicator")
+    
+    ' Document Checklist
+    Component(document_checklist, "Document Checklist", "Component", "Required documents list")
+    Component(document_item, "Document Item", "Component", "Single document status")
+    Component(upload_button, "Upload Button", "Component", "Upload document action")
+    
+    ' Payment Section
+    Component(payment_status, "Payment Status", "Component", "Payment information")
+    Component(payment_instructions, "Payment Instructions", "Component", "How to pay")
+    Component(upload_proof, "Upload Proof", "Component", "Upload payment proof")
+    
+    ' Actions
+    Component(quick_actions, "Quick Actions", "Component", "Common action buttons")
+    Component(edit_application, "Edit Application", "Button", "Edit draft application")
+    Component(view_details, "View Details", "Button", "View full application")
+    Component(download_card, "Download Card", "Button", "Download exam card")
+    
+    ' Notifications
+    Component(notification_bell, "Notification Bell", "Component", "New notifications indicator")
+    Component(notification_list, "Notification List", "Component", "List of notifications")
+}
+
+Container(api, "API", "Next.js API")
+ContainerDb(firestore, "Firestore", "Database")
+
+' Relationships
+Rel(dashboard_page, dashboard_layout, "Uses")
+Rel(dashboard_page, application_card, "Renders")
+Rel(dashboard_page, timeline_tracker, "Renders")
+Rel(dashboard_page, document_checklist, "Renders")
+Rel(dashboard_page, payment_status, "Renders")
+Rel(dashboard_page, quick_actions, "Renders")
+
+Rel(application_card, status_badge, "Shows")
+Rel(application_card, registration_number, "Displays")
+
+Rel(timeline_tracker, timeline_step, "Contains multiple")
+Rel(timeline_tracker, progress_bar, "Shows")
+
+Rel(document_checklist, document_item, "Lists")
+Rel(document_item, upload_button, "Contains")
+
+Rel(payment_status, payment_instructions, "Shows")
+Rel(payment_status, upload_proof, "Contains")
+
+Rel(quick_actions, edit_application, "Contains")
+Rel(quick_actions, view_details, "Contains")
+Rel(quick_actions, download_card, "Contains")
+
+Rel(dashboard_layout, notification_bell, "Shows")
+Rel(notification_bell, notification_list, "Opens")
+
+Rel(dashboard_page, api, "Fetch data")
+Rel(api, firestore, "Query")
+
+SHOW_LEGEND()
+
+@enduml
+
+@startuml Dashboard_Layout_Design
+
+title Student Dashboard Layout
+
+skinparam rectangle {
+    BackgroundColor<<header>> #3b82f6
+    BackgroundColor<<sidebar>> #f1f5f9
+    BackgroundColor<<content>> #ffffff
+    BackgroundColor<<card>> #ffffff
+}
+
+rectangle "Browser Window" {
+    rectangle "Header" as header <<header>> {
+        [Logo PPDB SaaS] as logo
+        [Nama Sekolah] as school_name
+        [Notifications (3)] as notif
+        [Profile Menu] as profile
+    }
+    
+    rectangle "Main Container" {
+        rectangle "Sidebar" as sidebar <<sidebar>> {
+            [Dashboard] as nav_dashboard
+            [Aplikasi Saya] as nav_apps
+            [Dokumen] as nav_docs
+            [Pembayaran] as nav_payment
+            [Status] as nav_status
+            [Bantuan] as nav_help
+        }
+        
+        rectangle "Content Area" as content <<content>> {
+            
+            rectangle "Welcome Section" {
+                [Halo, Budi Santoso] as welcome
+                [Status: Menunggu Verifikasi] as status
+            }
+            
+            rectangle "Application Card" as app_card <<card>> {
+                rectangle "Header" {
+                    [PPDB 2024/2025] as period
+                    [Badge: Submitted] as badge
+                }
+                rectangle "Info" {
+                    [No. Pendaftaran: SMA1-2024-0001] as reg_no
+                    [Jalur: Zonasi] as jalur
+                    [Tanggal Daftar: 15 Juni 2024] as date
+                }
+            }
+            
+            rectangle "Timeline Tracker" as timeline <<card>> {
+                [Progress: 60%] as progress
+                [✓ Pendaftaran] as step1
+                [✓ Pembayaran] as step2
+                [● Verifikasi Dokumen] as step3
+                [○ Pengumuman] as step4
+                [○ Daftar Ulang] as step5
+            }
+            
+            rectangle "Document Checklist" as docs <<card>> {
+                [✓ KTP Orang Tua - Terverifikasi] as doc1
+                [✓ Kartu Keluarga - Terverifikasi] as doc2
+                [⚠ Ijazah - Menunggu Verifikasi] as doc3
+                [✗ Rapor - Upload] as doc4
+            }
+            
+            rectangle "Payment Status" as payment <<card>> {
+                [Status: Lunas] as payment_status
+                [Jumlah: Rp 100,000] as amount
+                [Metode: Transfer Bank] as method
+                [Tanggal: 16 Juni 2024] as payment_date
+            }
+            
+            rectangle "Quick Actions" as actions <<card>> {
+                [Edit Aplikasi] as btn_edit
+                [Lihat Detail] as btn_view
+                [Download Kartu Ujian] as btn_download
+                [Hubungi Sekolah] as btn_contact
+            }
+        }
+    }
+}
+
+logo -down-> school_name
+school_name -down-> notif
+notif -down-> profile
+
+nav_dashboard -down-> nav_apps
+nav_apps -down-> nav_docs
+nav_docs -down-> nav_payment
+nav_payment -down-> nav_status
+nav_status -down-> nav_help
+
+sidebar -right-> content
+
+step1 -down-> step2
+step2 -down-> step3
+step3 -down-> step4
+step4 -down-> step5
+
+doc1 -down-> doc2
+doc2 -down-> doc3
+doc3 -down-> doc4
+
+note right of timeline
+  **Timeline Tracker:**
+  - Shows current stage
+  - Visual progress indicator
+  - Estimated dates
+  - Clear status icons
+  - Interactive (click for details)
+end note
+
+note right of docs
+  **Document Status:**
+  ✓ Verified
+  ● In Review
+  ⚠ Needs Attention
+  ✗ Not Uploaded
+end note
+
+note right of actions
+  **Quick Actions:**
+  - Edit: Only if status = draft
+  - View: Always available
+  - Download: Only after payment
+  - Contact: Opens WhatsApp/Email
+end note
+
+@enduml
+
+@startuml Dashboard_State_Flow
+
+title Student Dashboard State Flow
+
+[*] --> LoadingDashboard
+
+state "Loading Dashboard" as LoadingDashboard {
+    [*] --> FetchUser
+    FetchUser --> FetchApplications
+    FetchApplications --> FetchDocuments
+    FetchDocuments --> FetchPayments
+    FetchPayments --> [*]
+}
+
+LoadingDashboard --> ShowDashboard : Data loaded
+LoadingDashboard --> ShowError : Error
+
+state "Show Dashboard" as ShowDashboard {
+    [*] --> DisplayApplications
+    
+    state "Display Applications" as DisplayApplications {
+        [*] --> CheckStatus
+        
+        state "Check Status" as CheckStatus
+        CheckStatus --> DraftState : status = draft
+        CheckStatus --> SubmittedState : status = submitted
+        CheckStatus --> PaidState : status = paid
+        CheckStatus --> VerifiedState : status = verified
+        CheckStatus --> SelectedState : status = selected
+        CheckStatus --> RejectedState : status = rejected
+        
+        state "Draft State" as DraftState {
+            [*] --> ShowEditButton
+            ShowEditButton --> ShowResumePrompt
+        }
+        
+        state "Submitted State" as SubmittedState {
+            [*] --> ShowPaymentInstructions
+            ShowPaymentInstructions --> WaitingPayment
+        }
+        
+        state "Paid State" as PaidState {
+            [*] --> ShowVerificationStatus
+            ShowVerificationStatus --> ShowDocumentChecklist
+        }
+        
+        state "Verified State" as VerifiedState {
+            [*] --> ShowTestInformation
+            ShowTestInformation --> ShowDownloadExamCard
+        }
+        
+        state "Selected State" as SelectedState {
+            [*] --> ShowCongratulations
+            ShowCongratulations --> ShowReregistrationInfo
+        }
+        
+        state "Rejected State" as RejectedState {
+            [*] --> ShowRejectionReason
+            ShowRejectionReason --> ShowAppeaalOption
+        }
+    }
+    
+    DisplayApplications --> ViewDetails : Click view
+    DisplayApplications --> EditApplication : Click edit (if draft)
+    DisplayApplications --> DownloadCard : Click download
+    
+    ViewDetails --> DisplayApplications : Back
+    EditApplication --> DisplayApplications : Save/Cancel
+    DownloadCard --> DisplayApplications : Downloaded
+}
+
+ShowDashboard --> [*] : Logout
+
+note right of CheckStatus
+  **Status Mapping:**
+  - draft → Can edit
+  - submitted → Awaiting payment
+  - paid → Under verification
+  - verified → Can download card
+  - selected → Reregistration info
+  - rejected → Show reason
+end note
+
+note bottom of VerifiedState
+  **Exam Card Available:**
+  Only when:
+  1. Payment confirmed
+  2. Documents verified
+  3. Before test date
+end note
+
+@enduml
+
+@startuml Timeline_Tracker_Component
+
+title Timeline Tracker Component
+
+class TimelineTracker {
+    +currentStage: string
+    +stages: TimelineStage[]
+    +progress: number
+    +render(): JSX.Element
+}
+
+class TimelineStage {
+    +id: string
+    +name: string
+    +status: 'completed' | 'current' | 'upcoming'
+    +date: Date
+    +icon: React.Component
+    +description: string
+}
+
+class ProgressBar {
+    +percentage: number
+    +color: string
+    +animated: boolean
+    +render(): JSX.Element
+}
+
+class StageIcon {
+    +status: string
+    +icon: IconComponent
+    +getColor(): string
+    +render(): JSX.Element
+}
+
+TimelineTracker *-- TimelineStage
+TimelineTracker *-- ProgressBar
+TimelineStage *-- StageIcon
+
+note right of TimelineTracker
+  **Usage:**
+  
+  <TimelineTracker
+    currentStage="verification"
+    stages={[
+      {
+        id: 'registration',
+        name: 'Pendaftaran',
+        status: 'completed',
+        date: new Date('2024-06-15')
+      },
+      {
+        id: 'payment',
+        name: 'Pembayaran',
+        status: 'completed',
+        date: new Date('2024-06-16')
+      },
+      {
+        id: 'verification',
+        name: 'Verifikasi',
+        status: 'current',
+        date: null
+      },
+      {
+        id: 'announcement',
+        name: 'Pengumuman',
+        status: 'upcoming',
+        date: new Date('2024-07-15')
+      }
+    ]}
+  />
+end note
+
+note bottom of TimelineStage
+  **Stage Status Colors:**
+  - completed: Green (#22c55e)
+  - current: Blue (#3b82f6)
+  - upcoming: Gray (#9ca3af)
+  
+  **Icons:**
+  - completed: CheckCircle
+  - current: Loader (animated)
+  - upcoming: Circle
+end note
+
+@enduml

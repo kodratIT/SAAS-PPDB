@@ -1,0 +1,128 @@
+@startuml invoice-generation
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+title Invoice & Receipt Generation Flow
+
+' === SUB-DIAGRAM 1: Invoice Generation Process ===
+participant "System" as System
+participant "Invoice\nGenerator" as Generator
+participant "jsPDF" as PDF
+participant "Storage" as Storage
+participant "Email\nService" as Email
+participant "Student" as Student
+
+== Trigger: Payment Success ==
+System -> Generator: generateInvoice(paymentId)
+
+Generator -> Generator: Get payment data
+Generator -> Generator: Get application data
+Generator -> Generator: Get school data
+
+Generator -> PDF: Create new document
+PDF --> Generator: PDF instance
+
+Generator -> PDF: Add header\n(Invoice title, number, date)
+Generator -> PDF: Add school info
+Generator -> PDF: Add student info
+Generator -> PDF: Add payment details table
+Generator -> PDF: Add total amount
+Generator -> PDF: Add footer\n(Thank you message)
+
+PDF --> Generator: PDF blob
+
+Generator -> Storage: Upload PDF\ninvoices/{invoiceNumber}.pdf
+Storage --> Generator: Download URL
+
+Generator -> Generator: Save invoice record\n{url, number, date}
+
+Generator -> Email: Send invoice
+Email -> Email: Attach PDF
+Email -> Email: Template: "Invoice attached"
+Email --> Student: Email with invoice
+
+Generator --> System: Invoice generated
+
+@enduml
+
+'===============================================
+' SUB-DIAGRAM 2: Invoice Template Structure
+'===============================================
+@startuml invoice-template
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Invoice PDF Template Layout
+
+rectangle "Invoice PDF" {
+  rectangle "Header" {
+    card "INVOICE" as title
+    card "Invoice #: INV-2024-001" as number
+    card "Date: 13 Oct 2024" as date
+  }
+  
+  rectangle "School Info" {
+    card "SMA Negeri 1 Jakarta" as school
+    card "Jl. Example No. 123" as address
+    card "Tel: 021-12345678" as phone
+  }
+  
+  rectangle "Student Info" {
+    card "Billed To:" as label
+    card "Nama: John Doe" as name
+    card "No. Pendaftaran: PPDB-001" as regnum
+  }
+  
+  rectangle "Items Table" {
+    card "Description | Amount" as header
+    card "Biaya Pendaftaran PPDB 2024 | Rp 500.000" as item1
+    card "Biaya Administrasi | Rp 50.000" as item2
+  }
+  
+  rectangle "Total" {
+    card "TOTAL: Rp 550.000" as total
+  }
+  
+  rectangle "Footer" {
+    card "Terima kasih atas pembayaran Anda" as thanks
+    card "Invoice ini sah tanpa tanda tangan" as note
+  }
+}
+
+@enduml
+
+'===============================================
+' SUB-DIAGRAM 3: Receipt Download Flow
+'===============================================
+@startuml receipt-download
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+title Receipt Download by Student
+
+participant "Student" as Student
+participant "Dashboard" as UI
+participant "API" as API
+participant "Invoice\nGenerator" as Generator
+participant "Storage" as Storage
+
+Student -> UI: Click "Download Receipt"
+UI -> API: GET /api/invoice/download\n?paymentId={id}
+
+API -> API: Verify payment exists
+API -> API: Verify payment = "success"
+API -> API: Check if invoice exists
+
+alt Invoice exists
+  API -> Storage: Get invoice URL
+  Storage --> API: Download URL
+  API --> UI: Redirect to URL
+  UI --> Student: Download PDF
+  
+else Invoice not exists
+  API -> Generator: Generate invoice
+  Generator --> API: Invoice created
+  API -> Storage: Get invoice URL
+  Storage --> API: Download URL
+  API --> UI: Redirect to URL
+  UI --> Student: Download PDF
+end
+
+@enduml

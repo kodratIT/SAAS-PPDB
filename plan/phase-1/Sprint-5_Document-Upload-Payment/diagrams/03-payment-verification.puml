@@ -1,0 +1,134 @@
+@startuml payment-verification
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+title Manual Payment Verification Flow
+
+' === SUB-DIAGRAM 1: Complete Verification Process ===
+participant "Student" as Student
+participant "Student\nDashboard" as StudentUI
+participant "Admin\nPanel" as AdminUI
+participant "Verification\nAPI" as API
+participant "Firestore" as DB
+participant "Email\nService" as Email
+
+== Step 1: Student Upload Payment Proof ==
+Student -> StudentUI: Upload payment proof\n(transfer receipt)
+StudentUI -> DB: Save proof image URL
+DB --> StudentUI: Proof saved
+
+StudentUI -> DB: Update payment.proofUrl
+DB --> Student: Status: "pending_verification"
+
+== Step 2: Admin Review ==
+AdminUI -> DB: Query payments\nWHERE status = "pending_verification"
+DB --> AdminUI: List of pending payments
+
+AdminUI --> AdminUI: Admin reviews proof
+
+alt Approve Payment
+  AdminUI -> API: POST /api/payment/verify\n{paymentId, approved: true}
+  
+  API -> DB: Update payment.status = "success"
+  API -> DB: Update payment.verifiedBy = adminId
+  API -> DB: Update payment.verifiedAt = now()
+  
+  API -> DB: Update application.status = "paid"
+  
+  API -> Email: Send confirmation to student
+  Email --> Student: "Pembayaran Anda dikonfirmasi"
+  
+  API --> AdminUI: Verification success
+  
+else Reject Payment
+  AdminUI -> API: POST /api/payment/verify\n{paymentId, approved: false, reason}
+  
+  API -> DB: Update payment.status = "failed"
+  API -> DB: Save rejection reason
+  
+  API -> Email: Send rejection notice
+  Email --> Student: "Pembayaran ditolak:\n{reason}"
+  
+  API --> AdminUI: Rejection recorded
+end
+
+@enduml
+
+'===============================================
+' SUB-DIAGRAM 2: Payment Verification UI
+'===============================================
+@startuml verification-ui
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Payment Verification Admin Interface
+
+Container_Boundary(admin, "Admin Panel") {
+  Component(list, "PaymentList", "Component", "Filter & search payments")
+  Component(detail, "PaymentDetail", "Component", "View payment details")
+  Component(proof, "ProofViewer", "Component", "View transfer receipt")
+  Component(verify, "VerificationModal", "Component", "Approve/Reject")
+}
+
+Container_Boundary(student, "Student Portal") {
+  Component(upload, "ProofUpload", "Component", "Upload receipt image")
+  Component(status, "PaymentStatus", "Component", "Track verification")
+}
+
+Container(api, "Verification API", "Backend")
+Container(storage, "Firebase Storage", "Storage", "Proof images")
+Container(db, "Firestore", "Database")
+
+Rel(list, db, "Query pending")
+Rel(detail, proof, "shows")
+Rel(proof, storage, "loads from")
+Rel(verify, api, "calls")
+Rel(api, db, "updates")
+Rel(upload, storage, "uploads to")
+Rel(upload, db, "saves URL")
+Rel(status, db, "tracks")
+
+@enduml
+
+'===============================================
+' SUB-DIAGRAM 3: Refund Processing
+'===============================================
+@startuml refund-process
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+title Refund Processing Flow
+
+participant "Admin" as Admin
+participant "Refund API" as API
+participant "Midtrans" as Midtrans
+participant "Firestore" as DB
+participant "Email" as Email
+
+Admin -> API: POST /api/payment/refund\n{paymentId, amount, reason}
+
+API -> API: Validate refund request
+API -> API: Check payment status = "success"
+
+API -> DB: Get payment record
+DB --> API: Payment details
+
+API -> Midtrans: refund(orderId, amount)
+Midtrans -> Midtrans: Process refund
+
+alt Refund Success
+  Midtrans --> API: Refund approved
+  
+  API -> DB: Create refund record
+  API -> DB: Update payment.refundStatus = "refunded"
+  API -> DB: Update application.paymentStatus = "refunded"
+  
+  API -> Email: Notify student
+  Email --> Email: "Refund diproses"
+  
+  API --> Admin: Refund processed
+  
+else Refund Failed
+  Midtrans --> API: Refund failed
+  API -> DB: Log refund failure
+  API --> Admin: Error: {message}
+end
+
+@enduml

@@ -1,0 +1,144 @@
+@startuml Authentication_Flow_Diagram
+
+!define C4PlantUML https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master
+!include C4PlantUML/C4_Sequence.puml
+
+title Authentication Flow - PPDB SaaS Platform
+
+Person(user, "User", "Calon Siswa / Admin")
+System(browser, "Browser", "React/Next.js")
+System(nextjs, "Next.js Server", "API Routes")
+System(firebase_auth, "Firebase Auth", "Authentication Service")
+ContainerDb(firestore, "Firestore", "User Data")
+
+== Registration Flow ==
+
+user -> browser: 1. Fill registration form
+browser -> browser: 2. Validate with Zod schema
+browser -> firebase_auth: 3. createUserWithEmailAndPassword()
+firebase_auth -> firebase_auth: 4. Create auth user
+firebase_auth -> browser: 5. Return user + auth token
+browser -> firestore: 6. Create user document\n(role, name, preferences)
+firestore -> browser: 7. User doc created
+browser -> firebase_auth: 8. sendEmailVerification()
+firebase_auth -> user: 9. Send verification email
+browser -> user: 10. Show success message
+
+== Login Flow (Email/Password) ==
+
+user -> browser: 1. Enter email & password
+browser -> browser: 2. Validate input
+browser -> firebase_auth: 3. signInWithEmailAndPassword()
+firebase_auth -> firebase_auth: 4. Verify credentials
+firebase_auth -> browser: 5. Return user + ID token
+browser -> nextjs: 6. POST /api/auth/login\n{idToken}
+nextjs -> firebase_auth: 7. verifyIdToken(idToken)
+firebase_auth -> nextjs: 8. Token valid, return userId
+nextjs -> firestore: 9. getUser(userId)
+firestore -> nextjs: 10. Return user data + role
+nextjs -> nextjs: 11. Create session (JWT)
+nextjs -> browser: 12. Set session cookie (httpOnly)
+nextjs -> browser: 13. Return user data
+browser -> browser: 14. Update AuthContext
+browser -> user: 15. Redirect to dashboard\n(based on role)
+
+== Login Flow (Google OAuth) ==
+
+user -> browser: 1. Click "Login with Google"
+browser -> firebase_auth: 2. signInWithPopup(GoogleProvider)
+firebase_auth -> user: 3. Show Google account picker
+user -> firebase_auth: 4. Select Google account
+firebase_auth -> firebase_auth: 5. Verify with Google
+firebase_auth -> browser: 6. Return user + ID token
+browser -> firestore: 7. Check if user exists
+alt User exists
+    firestore -> browser: 8a. Return existing user
+else New user
+    browser -> firestore: 8b. Create user document
+    firestore -> browser: 8c. User created
+end
+browser -> nextjs: 9. POST /api/auth/login\n{idToken}
+nextjs -> browser: 10. Set session cookie
+browser -> user: 11. Redirect to dashboard
+
+== Password Reset Flow ==
+
+user -> browser: 1. Click "Forgot Password"
+user -> browser: 2. Enter email
+browser -> firebase_auth: 3. sendPasswordResetEmail()
+firebase_auth -> user: 4. Send reset email
+user -> user: 5. Click reset link in email
+user -> browser: 6. Open reset page with oobCode
+user -> browser: 7. Enter new password
+browser -> firebase_auth: 8. confirmPasswordReset(oobCode, newPassword)
+firebase_auth -> firebase_auth: 9. Update password
+firebase_auth -> browser: 10. Password updated
+browser -> user: 11. Redirect to login
+
+== Email Verification Flow ==
+
+user -> user: 1. Receive verification email
+user -> browser: 2. Click verification link
+browser -> firebase_auth: 3. applyActionCode(oobCode)
+firebase_auth -> firebase_auth: 4. Mark email as verified
+firebase_auth -> browser: 5. Verification success
+browser -> user: 6. Show success message\n& redirect to login
+
+== Logout Flow ==
+
+user -> browser: 1. Click logout
+browser -> firebase_auth: 2. signOut()
+firebase_auth -> browser: 3. Sign out success
+browser -> nextjs: 4. POST /api/auth/logout
+nextjs -> nextjs: 5. Delete session cookie
+nextjs -> browser: 6. Logout success
+browser -> browser: 7. Clear AuthContext
+browser -> user: 8. Redirect to login
+
+== Session Verification (on page load) ==
+
+browser -> nextjs: 1. GET /api/auth/session
+nextjs -> nextjs: 2. Verify session cookie (JWT)
+alt Valid session
+    nextjs -> firestore: 3a. Get user data
+    firestore -> nextjs: 3b. Return user data
+    nextjs -> browser: 3c. Return user
+    browser -> browser: 3d. Update AuthContext
+else Invalid/expired session
+    nextjs -> browser: 4a. Return 401 Unauthorized
+    browser -> user: 4b. Redirect to login
+end
+
+== Protected Route Access ==
+
+user -> browser: 1. Navigate to protected route
+browser -> nextjs: 2. Middleware checks session
+nextjs -> nextjs: 3. Verify JWT token
+alt Valid session + correct role
+    nextjs -> browser: 4a. Allow access
+    browser -> user: 4b. Show page
+else Invalid session or wrong role
+    nextjs -> browser: 5a. Redirect to /login or /unauthorized
+    browser -> user: 5b. Show login/403 page
+end
+
+note right of firebase_auth
+  **Security Features**:
+  - Email/password hashing
+  - OAuth 2.0 for Google
+  - JWT token expiry (7 days)
+  - Email verification
+  - Password reset with expiry
+  - Rate limiting on auth endpoints
+end note
+
+note right of nextjs
+  **Session Management**:
+  - JWT with HS256
+  - HttpOnly cookies
+  - Secure flag in production
+  - SameSite=Lax
+  - 7-day expiry
+end note
+
+@enduml

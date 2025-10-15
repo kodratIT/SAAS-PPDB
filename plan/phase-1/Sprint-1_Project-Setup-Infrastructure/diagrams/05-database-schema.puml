@@ -1,0 +1,276 @@
+@startuml PPDB_SaaS_Database_Schema
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Database Schema - Sprint 1 Collections Structure
+
+skinparam backgroundColor #FFFFFF
+skinparam roundcorner 10
+skinparam shadowing false
+
+package "Firebase Firestore Collections" {
+    
+    entity "tenants (schools)" as tenants {
+        * id : string <<PK>>
+        --
+        * name : string
+        * slug : string <<unique>>
+        * email : string
+        * phone : string
+        * address : Address
+        * npsn : string
+        * nss : string
+        * schoolType : enum(SD|SMP|SMA|SMK)
+        * status : enum(negeri|swasta)
+        * accreditation : enum(A|B|C|Belum)
+        logo : string (URL)
+        coverImage : string (URL)
+        gallery : string[]
+        about : About
+        socialMedia : SocialMedia
+        branding : Branding
+        customDomain : string
+        * subscription : Subscription
+        * quotas : Quotas
+        * features : Features
+        * settings : Settings
+        * createdAt : timestamp
+        * updatedAt : timestamp
+        createdBy : string <<FK>>
+    }
+    
+    entity "users" as users {
+        * id : string <<PK, Auth UID>>
+        --
+        * email : string <<unique>>
+        * name : string
+        phone : string
+        photoURL : string
+        * role : enum(super_admin|school_admin|panitia|student)
+        schoolId : string <<FK>>
+        permissions : string[]
+        * status : enum(active|inactive|suspended)
+        twoFactorEnabled : boolean
+        * preferences : Preferences
+        lastLogin : timestamp
+        * createdAt : timestamp
+        * updatedAt : timestamp
+    }
+    
+    entity "subscription_plans" as plans {
+        * id : string <<PK>>
+        --
+        * name : string
+        * description : string
+        * price : number
+        * billingCycle : enum(monthly|yearly)
+        * features : PlanFeatures
+        trialDays : number
+        * isActive : boolean
+        sortOrder : number
+        * createdAt : timestamp
+        * updatedAt : timestamp
+    }
+    
+    entity "ppdb_periods" as periods {
+        * id : string <<PK>>
+        --
+        * schoolId : string <<FK>>
+        * name : string
+        * academicYear : string
+        * batch : number
+        * status : enum(draft|active|closed|archived)
+        * timeline : Timeline
+        * quotas : PeriodQuotas
+        * fees : Fees
+        * jalur : JalurPendaftaran[]
+        autoCloseWhenFull : boolean
+        * createdAt : timestamp
+        * updatedAt : timestamp
+        createdBy : string <<FK>>
+    }
+    
+    entity "form_configs" as forms {
+        * id : string <<PK>>
+        --
+        * schoolId : string <<FK>>
+        * periodId : string <<FK>>
+        * name : string
+        isDefault : boolean
+        * sections : FormSection[]
+        * documents : DocumentRequirement[]
+        * settings : FormSettings
+        * createdAt : timestamp
+        * updatedAt : timestamp
+    }
+    
+    entity "applications" as applications {
+        * id : string <<PK>>
+        --
+        * schoolId : string <<FK>>
+        * periodId : string <<FK>>
+        * userId : string <<FK>>
+        * registrationNumber : string <<unique>>
+        * jalurId : string
+        * status : enum(draft|submitted|paid|verified|rejected|selected|accepted|declined|re_registered)
+        * formData : ApplicationFormData
+        documents : DocumentStatus{}
+        payment : PaymentInfo
+        verification : VerificationInfo
+        scores : ScoreData
+        ranking : number
+        selectionResult : SelectionResult
+        * timeline : TimelineEvent[]
+        notes : string
+        submittedAt : timestamp
+        * createdAt : timestamp
+        * updatedAt : timestamp
+    }
+    
+    entity "payments" as payments {
+        * id : string <<PK>>
+        --
+        * schoolId : string <<FK>>
+        * applicationId : string <<FK>>
+        * userId : string <<FK>>
+        * type : enum(registration|reregistration|subscription)
+        * amount : number
+        method : string
+        * status : enum(pending|processing|success|failed|expired|refunded)
+        * gatewayProvider : enum(midtrans|xendit|manual)
+        externalId : string
+        vaNumber : string
+        qrCodeUrl : string
+        paymentUrl : string
+        expiryDate : timestamp
+        paidAt : timestamp
+        proofUrl : string
+        invoiceUrl : string
+        refund : RefundInfo
+        gatewayResponse : json
+        metadata : json
+        * createdAt : timestamp
+        * updatedAt : timestamp
+    }
+    
+    entity "notifications" as notifications {
+        * id : string <<PK>>
+        --
+        * userId : string <<FK>>
+        schoolId : string <<FK>>
+        * type : enum(info|success|warning|error)
+        * category : enum(application|payment|document|announcement|system)
+        * title : string
+        * message : string
+        actionUrl : string
+        * read : boolean
+        readAt : timestamp
+        metadata : json
+        expiresAt : timestamp
+        * createdAt : timestamp
+        * updatedAt : timestamp
+    }
+    
+    entity "audit_logs" as logs {
+        * id : string <<PK>>
+        --
+        * userId : string <<FK>>
+        schoolId : string <<FK>>
+        * action : string
+        * entity : string
+        entityId : string
+        * changes : json
+        ipAddress : string
+        userAgent : string
+        * timestamp : timestamp
+    }
+}
+
+' Relationships
+tenants ||--o{ users : "has admins"
+tenants ||--o{ periods : "creates"
+tenants ||--o{ forms : "configures"
+tenants ||--o{ applications : "receives"
+tenants ||--o{ payments : "processes"
+
+users ||--o{ applications : "submits"
+users ||--o{ notifications : "receives"
+users ||--o{ logs : "generates"
+
+plans ||--o| tenants : "subscribed by"
+
+periods ||--o{ forms : "has config"
+periods ||--o{ applications : "receives"
+
+forms ||--o{ applications : "used by"
+
+applications ||--o| payments : "requires"
+applications ||--o{ notifications : "triggers"
+
+' Legend for nested objects
+note right of tenants
+  **Nested Objects:**
+  - Address: {street, city, province, postalCode, coordinates}
+  - About: {vision, mission, history, facilities[], achievements[]}
+  - SocialMedia: {facebook, instagram, twitter, youtube, whatsapp}
+  - Branding: {primaryColor, secondaryColor, font, favicon}
+  - Subscription: {planId, status, startDate, endDate, billingCycle, autoRenew}
+  - Quotas: {maxStudents, maxAdmins, maxStorage, usedStudents, usedStorage}
+  - Features: {customForms, whatsappNotif, whiteLabel, apiAccess, prioritySupport}
+  - Settings: {timezone, dateFormat, language, emailSignature}
+end note
+
+note right of periods
+  **Nested Objects:**
+  - Timeline: {registrationStart, registrationEnd, editDeadline, 
+    documentDeadline, verificationStart, verificationEnd, 
+    testDate, announcementDate, reregistrationStart, reregistrationEnd}
+  - PeriodQuotas: {total, prestasi, zonasi, umum, afirmasi, perpindahan}
+  - Fees: {registrationFee, reregistrationFee, paymentMethods[], paymentDeadline}
+  - JalurPendaftaran[]: {id, name, description, quota, criteria, active}
+end note
+
+note right of applications
+  **Nested Objects:**
+  - ApplicationFormData: {personal, address, parents, education, achievements[]}
+  - DocumentStatus: {url, status, note, verifiedBy, verifiedAt}
+  - PaymentInfo: {amount, status, method, transactionId, paidAt}
+  - VerificationInfo: {status, verifiedBy, verifiedAt, notes}
+  - ScoreData: {academic, achievement, zonasi, test, interview, total}
+  - SelectionResult: {status, announcedAt, acceptanceLetterUrl, reregistered}
+  - TimelineEvent[]: {event, timestamp, by}
+end note
+
+note bottom of forms
+  **Nested Objects:**
+  - FormSection[]: {id, title, order, fields[]}
+  - FormField: {id, type, label, required, validation, options[]}
+  - DocumentRequirement[]: {id, name, required, allowedFormats[], maxSizeKB}
+  - FormSettings: {multiStep, showProgress, autoSaveInterval}
+end note
+
+' Indexes note
+note as indexes
+  **Composite Indexes Required:**
+  
+  applications:
+  - (schoolId, status, createdAt DESC)
+  - (schoolId, periodId, createdAt DESC)
+  - (schoolId, jalurId, ranking ASC)
+  - (userId, createdAt DESC)
+  
+  periods:
+  - (schoolId, status, createdAt DESC)
+  
+  notifications:
+  - (userId, read, createdAt DESC)
+  
+  payments:
+  - (schoolId, status, createdAt DESC)
+  - (userId, createdAt DESC)
+  
+  users:
+  - (schoolId, role, status)
+  - (email) - unique
+end note
+
+@enduml

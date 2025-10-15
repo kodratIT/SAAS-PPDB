@@ -1,0 +1,453 @@
+@startuml Form_Builder_Component_Structure
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Custom Form Builder - Component Structure
+
+Container_Boundary(form_builder_app, "Form Builder Application") {
+    
+    ' Main Components
+    Component(form_builder, "Form Builder Page", "React Page", "Main form builder interface")
+    Component(form_list, "Form List", "Component", "List of saved forms")
+    
+    ' Builder Components
+    Component(builder_canvas, "Builder Canvas", "Component", "Main drag-drop area")
+    Component(field_palette, "Field Palette", "Component", "Available field types")
+    Component(properties_panel, "Properties Panel", "Component", "Edit field properties")
+    Component(preview_panel, "Preview Panel", "Component", "Live form preview")
+    
+    ' Field Type Components
+    Component(text_field, "Text Field", "Component", "Single line text input")
+    Component(textarea_field, "Textarea Field", "Component", "Multi-line text")
+    Component(number_field, "Number Field", "Component", "Numeric input")
+    Component(select_field, "Select Field", "Component", "Dropdown selection")
+    Component(radio_field, "Radio Field", "Component", "Radio buttons")
+    Component(checkbox_field, "Checkbox Field", "Component", "Checkboxes")
+    Component(date_field, "Date Field", "Component", "Date picker")
+    Component(file_field, "File Field", "Component", "File upload")
+    Component(address_field, "Address Field", "Component", "Address inputs")
+    
+    ' Drag & Drop
+    Component(dnd_context, "DnD Context", "dnd-kit", "Drag and drop context")
+    Component(draggable, "Draggable Field", "Component", "Draggable wrapper")
+    Component(droppable, "Droppable Zone", "Component", "Drop target")
+    
+    ' Form State
+    Component(form_state, "Form State", "React State", "Current form configuration")
+    Component(validation_rules, "Validation Rules", "Zod", "Field validation schemas")
+    
+    ' Actions
+    Component(save_form, "Save Form", "Component", "Save configuration")
+    Component(export_form, "Export Form", "Component", "Export as JSON")
+    Component(import_form, "Import Form", "Component", "Import from JSON")
+}
+
+' External
+Container(api, "API", "Next.js API")
+ContainerDb(firestore, "Firestore", "Database")
+
+' Relationships
+Rel(form_builder, builder_canvas, "Renders")
+Rel(form_builder, field_palette, "Renders")
+Rel(form_builder, properties_panel, "Renders")
+Rel(form_builder, preview_panel, "Renders")
+
+Rel(field_palette, text_field, "Contains")
+Rel(field_palette, select_field, "Contains")
+Rel(field_palette, file_field, "Contains")
+
+Rel(builder_canvas, dnd_context, "Uses")
+Rel(dnd_context, draggable, "Wraps fields")
+Rel(dnd_context, droppable, "Defines zones")
+
+Rel(builder_canvas, form_state, "Updates")
+Rel(properties_panel, form_state, "Edits")
+Rel(preview_panel, form_state, "Renders from")
+
+Rel(save_form, api, "POST form config")
+Rel(api, firestore, "Save to form_configs")
+
+Rel(form_state, validation_rules, "Uses")
+
+SHOW_LEGEND()
+
+@enduml
+
+@startuml Form_Builder_Interaction_Flow
+
+title Form Builder User Interaction Flow
+
+actor "School Admin" as admin
+participant "Form Builder UI" as ui
+participant "Field Palette" as palette
+participant "Canvas" as canvas
+participant "Properties Panel" as props
+participant "Form State" as state
+participant "Preview" as preview
+participant "API" as api
+database "Firestore" as db
+
+== Add Field to Form ==
+
+admin -> palette: Click "Text Input" field
+palette -> canvas: Drag field to canvas
+canvas -> state: Add field to configuration
+state -> preview: Update preview
+preview -> admin: Show field in preview
+
+== Configure Field ==
+
+admin -> canvas: Click field in canvas
+canvas -> props: Open properties panel
+props -> admin: Show field properties
+
+admin -> props: Edit properties:\n- Label: "Nama Lengkap"\n- Required: true\n- Placeholder: "Masukkan nama"
+
+props -> state: Update field config
+state -> preview: Re-render preview
+preview -> admin: Show updated field
+
+== Add Validation ==
+
+admin -> props: Add validation rules
+props -> admin: Show validation options
+
+admin -> props: Select:\n- Min length: 3\n- Max length: 100\n- Pattern: Letters only
+
+props -> state: Add validation to field
+state -> preview: Update preview
+preview -> admin: Show validation hint
+
+== Reorder Fields (Drag & Drop) ==
+
+admin -> canvas: Drag "Email" field
+admin -> canvas: Drop above "Phone" field
+canvas -> state: Reorder fields array
+state -> preview: Update field order
+preview -> admin: Show new order
+
+== Add Conditional Logic ==
+
+admin -> props: Add conditional rule
+admin -> props: "Show if School Type = SMA"
+
+props -> state: Add condition to field
+state -> admin: Condition added
+
+== Add Section ==
+
+admin -> ui: Click "Add Section"
+ui -> state: Create new section
+state -> preview: Render section
+preview -> admin: Show new section
+
+admin -> ui: Enter section title:\n"Data Pribadi Siswa"
+ui -> state: Update section title
+
+== Save Form ==
+
+admin -> ui: Click "Save Form"
+ui -> ui: Validate configuration
+ui -> api: POST /api/forms\n{formConfig}
+
+api -> api: Validate schema
+api -> db: Save form_configs document
+db -> api: Document ID
+
+api -> ui: Save success
+ui -> admin: "Form berhasil disimpan"
+
+== Load Existing Form ==
+
+admin -> ui: Click edit on existing form
+ui -> api: GET /api/forms/{formId}
+api -> db: Query form_configs
+db -> api: Form configuration
+api -> state: Load into state
+state -> canvas: Render fields
+state -> preview: Show preview
+canvas -> admin: Editable form
+
+note right of state
+  **Form Configuration Structure:**
+  
+  {
+    id: "form-1",
+    name: "Formulir PPDB 2024",
+    schoolId: "school-a",
+    periodId: "period-1",
+    sections: [
+      {
+        id: "section-1",
+        title: "Data Pribadi",
+        order: 1,
+        fields: [
+          {
+            id: "field-1",
+            type: "text",
+            label: "Nama Lengkap",
+            required: true,
+            validation: {
+              min: 3,
+              max: 100
+            },
+            order: 1
+          },
+          // ... more fields
+        ]
+      }
+    ],
+    documents: [
+      {
+        id: "doc-1",
+        name: "KTP Orang Tua",
+        required: true,
+        maxSizeKB: 2048
+      }
+    ]
+  }
+end note
+
+@enduml
+
+@startuml Form_Builder_Field_Types
+
+title Form Builder - Field Types & Components
+
+package "Field Types" {
+    abstract class BaseField {
+        +id: string
+        +type: FieldType
+        +label: string
+        +placeholder: string
+        +required: boolean
+        +helpText: string
+        +order: number
+        +validation: ValidationRule
+        +conditionalVisibility: Condition
+        +render(): JSX.Element
+        +validate(value): boolean
+    }
+    
+    class TextField {
+        +minLength: number
+        +maxLength: number
+        +pattern: RegExp
+    }
+    
+    class TextareaField {
+        +rows: number
+        +minLength: number
+        +maxLength: number
+    }
+    
+    class NumberField {
+        +min: number
+        +max: number
+        +step: number
+    }
+    
+    class SelectField {
+        +options: Option[]
+        +multiple: boolean
+    }
+    
+    class RadioField {
+        +options: Option[]
+    }
+    
+    class CheckboxField {
+        +options: Option[]
+    }
+    
+    class DateField {
+        +minDate: Date
+        +maxDate: Date
+        +format: string
+    }
+    
+    class FileField {
+        +acceptedFormats: string[]
+        +maxSizeKB: number
+        +multiple: boolean
+    }
+    
+    class AddressField {
+        +includeMap: boolean
+        +requiredFields: string[]
+    }
+}
+
+BaseField <|-- TextField
+BaseField <|-- TextareaField
+BaseField <|-- NumberField
+BaseField <|-- SelectField
+BaseField <|-- RadioField
+BaseField <|-- CheckboxField
+BaseField <|-- DateField
+BaseField <|-- FileField
+BaseField <|-- AddressField
+
+package "Validation" {
+    class ValidationRule {
+        +min: number
+        +max: number
+        +pattern: RegExp
+        +custom: Function
+        +message: string
+    }
+    
+    class ConditionalLogic {
+        +fieldId: string
+        +operator: string
+        +value: any
+        +evaluate(): boolean
+    }
+}
+
+BaseField --> ValidationRule
+BaseField --> ConditionalLogic
+
+package "Field Properties Editor" {
+    class PropertyEditor {
+        +field: BaseField
+        +onChange(field): void
+        +render(): JSX.Element
+    }
+    
+    class TextPropertyEditor {
+        +editLabel()
+        +editPlaceholder()
+        +editValidation()
+    }
+    
+    class SelectPropertyEditor {
+        +editOptions()
+        +addOption()
+        +removeOption()
+    }
+    
+    class FilePropertyEditor {
+        +editAcceptedFormats()
+        +editMaxSize()
+    }
+}
+
+PropertyEditor <|-- TextPropertyEditor
+PropertyEditor <|-- SelectPropertyEditor
+PropertyEditor <|-- FilePropertyEditor
+
+note right of BaseField
+  **Common Properties:**
+  - All fields have base props
+  - Extensible for custom fields
+  - Type-safe with TypeScript
+  
+  **Validation:**
+  - Client-side validation
+  - Zod schema generation
+  - Custom validators
+end note
+
+note bottom of SelectField
+  **Dynamic Options:**
+  
+  Options can be:
+  1. Static: ["Option A", "Option B"]
+  2. From API: fetch provinces/cities
+  3. Conditional: Based on other field
+end note
+
+@enduml
+
+@startuml Form_Rendering_Flow
+
+title Form Rendering - Student View
+
+actor "Student" as student
+participant "Application Form" as form
+participant "Form Renderer" as renderer
+participant "Field Component" as field
+participant "Validation" as validate
+participant "Form State" as state
+participant "API" as api
+database "Firestore" as db
+
+== Load Form ==
+
+student -> form: Visit application page
+form -> api: GET /api/forms/{periodId}
+api -> db: Query form_configs
+db -> api: Form configuration
+api -> form: Return form config
+form -> renderer: Initialize with config
+
+== Render Form ==
+
+renderer -> renderer: Parse sections & fields
+renderer -> field: Render each field type
+field -> student: Display form
+
+== Fill Form ==
+
+student -> field: Enter "Nama Lengkap"
+field -> validate: Validate on change
+validate -> field: Valid / Invalid
+field -> state: Update form state
+state -> field: Reflect validation
+
+== Conditional Field ==
+
+student -> field: Select "School Type: SMA"
+field -> state: Update value
+state -> renderer: Trigger re-render
+renderer -> renderer: Evaluate conditions
+renderer -> field: Show/hide conditional fields
+field -> student: "Jurusan" field appears
+
+== Submit Form ==
+
+student -> form: Click "Submit"
+form -> validate: Validate all fields
+validate -> form: Validation results
+
+alt All fields valid
+    form -> api: POST /api/applications\n{formData}
+    api -> db: Save application
+    db -> api: Application created
+    api -> form: Success
+    form -> student: "Pendaftaran berhasil"
+else Has errors
+    form -> field: Highlight errors
+    field -> student: Show error messages
+end
+
+note right of renderer
+  **Form Renderer Logic:**
+  
+  1. Parse form config
+  2. Render sections in order
+  3. Render fields in order
+  4. Evaluate conditional logic
+  5. Show/hide fields dynamically
+  6. Aggregate validation errors
+end note
+
+note right of validate
+  **Validation Rules:**
+  
+  Generated from form config:
+  - Required fields
+  - Min/max length
+  - Pattern matching
+  - Custom validators
+  - File type/size
+  
+  Runs on:
+  - onChange (real-time)
+  - onBlur (on field exit)
+  - onSubmit (final check)
+end note
+
+@enduml

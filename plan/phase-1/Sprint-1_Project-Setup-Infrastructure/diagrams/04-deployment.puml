@@ -1,0 +1,134 @@
+@startuml PPDB_SaaS_Deployment_Diagram
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Deployment Diagram - PPDB SaaS Platform (Sprint 1)
+
+Deployment_Node(developer_machine, "Developer Machine", "macOS / Windows / Linux") {
+    Deployment_Node(vscode, "VS Code", "Code Editor") {
+        Container(local_code, "Source Code", "TypeScript, React", "Development workspace")
+    }
+    
+    Deployment_Node(node_runtime, "Node.js Runtime", "Node.js 20.x") {
+        Container(dev_server, "Next.js Dev Server", "localhost:3000", "Development server dengan hot reload")
+    }
+    
+    Deployment_Node(firebase_emulators, "Firebase Emulators", "Firebase CLI") {
+        Container(firestore_emulator, "Firestore Emulator", "localhost:8080", "Local Firestore database")
+        Container(auth_emulator, "Auth Emulator", "localhost:9099", "Local authentication")
+        Container(storage_emulator, "Storage Emulator", "localhost:9199", "Local file storage")
+        Container(emulator_ui, "Emulator UI", "localhost:4000", "Emulator management interface")
+    }
+}
+
+Deployment_Node(github_cloud, "GitHub", "Cloud") {
+    Container(git_repo, "Git Repository", "Source code, CI/CD workflows", "Version control")
+    
+    Deployment_Node(github_actions, "GitHub Actions", "CI/CD Runner") {
+        Container(ci_workflow, "CI Workflow", "Lint, Test, Type-check", "Automated checks on PR")
+        Container(cd_workflow, "CD Workflow", "Deploy on merge", "Automated deployment")
+    }
+}
+
+Deployment_Node(vercel_cloud, "Vercel Platform", "Cloud / Edge Network") {
+    Deployment_Node(vercel_edge, "Edge Network", "CDN") {
+        Container(edge_functions, "Edge Functions", "Middleware, ISR", "Edge-optimized functions")
+    }
+    
+    Deployment_Node(vercel_serverless, "Serverless Functions", "Node.js Runtime") {
+        Container(api_functions, "API Routes", "Next.js API", "Serverless API endpoints")
+        Container(ssr_functions, "SSR Functions", "React Server Components", "Server-side rendering")
+    }
+    
+    Deployment_Node(vercel_static, "Static Hosting", "CDN") {
+        Container(static_assets, "Static Assets", "JS, CSS, Images", "Optimized static files")
+    }
+}
+
+Deployment_Node(firebase_cloud, "Google Cloud Platform (Firebase)", "Cloud") {
+    Deployment_Node(firebase_services, "Firebase Services", "Managed Services") {
+        ContainerDb(prod_firestore, "Cloud Firestore", "NoSQL Database", "Production database with multi-region")
+        Container(prod_auth, "Firebase Auth", "Authentication", "Production auth service")
+        ContainerDb(prod_storage, "Cloud Storage", "Object Storage", "Production file storage")
+    }
+    
+    Deployment_Node(firebase_security, "Security Layer", "IAM & Rules") {
+        Container(firestore_rules, "Firestore Rules", "Security rules", "Document-level access control")
+        Container(storage_rules, "Storage Rules", "Security rules", "File-level access control")
+    }
+}
+
+Deployment_Node(monitoring, "Monitoring & Analytics", "Cloud") {
+    Container(vercel_analytics, "Vercel Analytics", "Performance metrics", "Web vitals, page views")
+    Container(firebase_analytics, "Firebase Analytics", "User analytics", "User behavior tracking")
+}
+
+' Development flow
+Rel(local_code, dev_server, "npm run dev", "Local development")
+Rel(dev_server, firebase_emulators, "Connects to", "Firebase SDK")
+Rel(local_code, git_repo, "git push", "Version control")
+
+' CI/CD flow
+Rel(git_repo, github_actions, "Triggers", "On push/PR")
+Rel(ci_workflow, local_code, "Runs checks", "GitHub Actions")
+Rel(cd_workflow, vercel_cloud, "Deploys", "Vercel CLI")
+Rel(cd_workflow, firebase_cloud, "Deploys rules", "Firebase CLI")
+
+' Production architecture
+Rel(vercel_edge, edge_functions, "Routes requests", "HTTP")
+Rel(edge_functions, ssr_functions, "SSR requests", "Internal")
+Rel(edge_functions, static_assets, "Static requests", "CDN")
+
+Rel(ssr_functions, api_functions, "API calls", "Internal")
+Rel(api_functions, prod_firestore, "Read/Write", "Firebase Admin SDK")
+Rel(api_functions, prod_auth, "Verify tokens", "Firebase Admin SDK")
+Rel(api_functions, prod_storage, "Upload/Download", "Firebase Admin SDK")
+
+' Security layer
+Rel(prod_firestore, firestore_rules, "Enforces", "Security Rules")
+Rel(prod_storage, storage_rules, "Enforces", "Security Rules")
+
+' Monitoring
+Rel(vercel_serverless, vercel_analytics, "Sends metrics", "HTTP")
+Rel(firebase_services, firebase_analytics, "Sends events", "Firebase SDK")
+
+' Browser to edge
+Deployment_Node(browser, "User Browser", "Chrome, Safari, Firefox") {
+    Container(web_client, "Web Application", "React, Next.js", "Client-side application")
+}
+
+Rel(web_client, vercel_edge, "HTTPS requests", "HTTPS")
+Rel(web_client, prod_firestore, "Real-time sync", "WebSocket")
+Rel(web_client, prod_auth, "Authentication", "Firebase SDK")
+Rel(web_client, prod_storage, "File upload", "Firebase SDK")
+
+' Environment variables
+note right of vercel_serverless
+  **Environment Variables**
+  - NEXT_PUBLIC_FIREBASE_API_KEY
+  - NEXT_PUBLIC_FIREBASE_PROJECT_ID
+  - FIREBASE_ADMIN_PROJECT_ID
+  - FIREBASE_ADMIN_CLIENT_EMAIL
+  - FIREBASE_ADMIN_PRIVATE_KEY
+end note
+
+note right of firebase_emulators
+  **Development Environment**
+  - Uses local Firebase emulators
+  - No cloud costs during development
+  - Fast iteration cycle
+  - Seed data available
+end note
+
+note right of firebase_cloud
+  **Production Environment**
+  - Multi-region deployment
+  - Auto-scaling
+  - 99.95% SLA
+  - Managed backups
+end note
+
+SHOW_LEGEND()
+
+@enduml

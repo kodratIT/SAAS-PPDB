@@ -1,0 +1,173 @@
+@startuml admin-dashboard
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Admin Dashboard Architecture - Sprint 6
+
+' === SUB-DIAGRAM 1: Dashboard Components ===
+Container_Boundary(dashboard, "Dashboard Page") {
+  Component(stats, "StatsCards", "Component", "Total applications, payments, users")
+  Component(charts, "ChartsSection", "Component", "Trends & analytics")
+  Component(recent, "RecentActivity", "Component", "Latest actions feed")
+  Component(quick, "QuickActions", "Component", "Common admin tasks")
+}
+
+Container_Boundary(charts_detail, "Charts Components") {
+  Component(line, "ApplicationTrend", "Chart", "Applications over time")
+  Component(pie, "StatusDistribution", "Chart", "Status breakdown")
+  Component(bar, "PaymentStatus", "Chart", "Payment analytics")
+}
+
+Container_Boundary(api, "Dashboard API") {
+  Component(stats_api, "GET /admin/stats", "Endpoint", "Overall statistics")
+  Component(trends_api, "GET /admin/trends", "Endpoint", "Time-series data")
+  Component(activity_api, "GET /admin/activity", "Endpoint", "Recent activities")
+}
+
+Container(db, "Firestore", "Database", "Real-time data")
+Container(analytics, "Firebase Analytics", "Service", "Usage metrics")
+
+Rel(stats, stats_api, "fetches from")
+Rel(charts, trends_api, "fetches from")
+Rel(recent, activity_api, "fetches from")
+
+Rel(charts, line, "contains")
+Rel(charts, pie, "contains")
+Rel(charts, bar, "contains")
+
+Rel(stats_api, db, "queries")
+Rel(trends_api, db, "aggregates")
+Rel(activity_api, db, "subscribes")
+
+Rel(db, analytics, "tracks events")
+
+@enduml
+
+'===============================================
+' SUB-DIAGRAM 2: Real-Time Dashboard Updates
+'===============================================
+@startuml realtime-updates
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+title Real-Time Dashboard Updates
+
+participant "Dashboard" as Dashboard
+participant "Firestore\nListener" as Listener
+participant "Firestore" as DB
+participant "Student" as Student
+
+Dashboard -> Listener: Subscribe to applications
+Listener -> DB: onSnapshot('applications')
+
+== Real-Time Update Triggered ==
+Student -> DB: Submit new application
+
+DB -> Listener: Snapshot update event
+Listener -> Dashboard: New data received
+
+Dashboard -> Dashboard: Update stats\n(total +1, pending +1)
+Dashboard -> Dashboard: Update charts
+Dashboard -> Dashboard: Add to recent activity
+
+Dashboard --> Dashboard: Re-render UI
+
+note right of Dashboard
+  No page refresh needed
+  Updates happen automatically
+  Smooth UX for admin
+end note
+
+@enduml
+
+'===============================================
+' SUB-DIAGRAM 3: Dashboard Statistics Calculation
+'===============================================
+@startuml stats-calculation
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+title Statistics API Implementation
+
+participant "Dashboard" as Dashboard
+participant "API" as API
+participant "Firestore" as DB
+
+Dashboard -> API: GET /api/admin/stats
+
+API -> DB: Query applications collection
+DB --> API: All applications
+
+API -> API: Calculate statistics:
+note right
+  totalApplications = count(*)
+  pending = count(status='submitted')
+  approved = count(status='approved')
+  rejected = count(status='rejected')
+end note
+
+API -> DB: Query payments collection
+DB --> API: All payments
+
+API -> API: Calculate payment stats:
+note right
+  totalPayments = sum(amount WHERE status='success')
+  pendingPayments = count(status='pending')
+end note
+
+API -> DB: Query users collection
+DB --> API: User counts
+
+API -> API: Aggregate final stats
+
+API --> Dashboard: {
+  totalApplications: 150,
+  pending: 25,
+  approved: 100,
+  rejected: 25,
+  totalPayments: 75000000,
+  totalUsers: 150
+}
+
+@enduml
+
+'===============================================
+' SUB-DIAGRAM 4: Dashboard Layout Design
+'===============================================
+@startuml dashboard-layout
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Dashboard Page Layout
+
+rectangle "Dashboard Layout" {
+  rectangle "Header" {
+    card "Dashboard Title" as title
+    card "Date Range Selector" as date
+    card "Refresh Button" as refresh
+  }
+  
+  rectangle "Statistics Row" {
+    card "Total Applications\n150" as stat1
+    card "Pending Review\n25" as stat2
+    card "Approved\n100" as stat3
+    card "Total Payments\nRp 75M" as stat4
+  }
+  
+  rectangle "Charts Section" {
+    rectangle "Left Column" {
+      card "Application Trend\nLine Chart" as chart1
+      card "Payment Status\nBar Chart" as chart2
+    }
+    
+    rectangle "Right Column" {
+      card "Status Distribution\nPie Chart" as chart3
+      card "Recent Activity\nList" as activity
+    }
+  }
+  
+  rectangle "Quick Actions" {
+    card "Verify Applications" as action1
+    card "View Payments" as action2
+    card "Export Reports" as action3
+    card "System Settings" as action4
+  }
+}
+
+@enduml

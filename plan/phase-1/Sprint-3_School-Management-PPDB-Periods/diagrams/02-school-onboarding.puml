@@ -1,0 +1,404 @@
+@startuml School_Onboarding_Flow
+
+!define C4PlantUML https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master
+!include C4PlantUML/C4_Sequence.puml
+
+title School Onboarding Flow - Complete Registration
+
+Person(admin, "School Admin", "Future admin")
+System(browser, "Browser", "React/Next.js")
+System(api, "API", "Next.js API Routes")
+System(firebase_auth, "Firebase Auth")
+ContainerDb(firestore, "Firestore")
+ContainerDb(storage, "Firebase Storage")
+System(email_service, "Email Service")
+
+== Step 1: Basic Information ==
+
+admin -> browser: Visit /school/register
+browser -> admin: Show Step 1 form
+
+admin -> browser: Fill school info\n(name, NPSN, type, etc.)
+browser -> browser: Validate with Zod
+browser -> browser: Save to context
+browser -> admin: Move to Step 2
+
+== Step 2: Address & Contact ==
+
+browser -> admin: Show Step 2 form
+admin -> browser: Fill address\n(province, city, postal code)
+browser -> browser: Validate address
+browser -> browser: Save to context
+browser -> admin: Move to Step 3
+
+== Step 3: Logo & Banner ==
+
+browser -> admin: Show Step 3 form
+admin -> browser: Upload logo
+browser -> browser: Compress image\n(max 400px width)
+browser -> browser: Create preview
+admin -> browser: Upload banner
+browser -> browser: Compress image\n(max 1200px width)
+browser -> browser: Save files to context
+browser -> admin: Move to Step 4
+
+== Step 4: Subscription Selection ==
+
+browser -> api: GET /api/subscription-plans
+api -> firestore: Query plans
+firestore -> api: Return active plans
+api -> browser: List of plans
+browser -> admin: Show plan options
+
+admin -> browser: Select plan
+browser -> browser: Save selection
+browser -> admin: Move to Step 5
+
+== Step 5: Admin Account Creation ==
+
+browser -> admin: Show Step 5 form
+admin -> browser: Enter admin credentials\n(name, email, password)
+browser -> browser: Validate credentials
+browser -> admin: Show summary
+
+admin -> browser: Confirm & Submit
+
+== Complete Registration ==
+
+browser -> browser: Collect all data\nfrom context
+
+browser -> api: POST /api/schools/register\n{all onboarding data}
+
+api -> api: Validate all data
+api -> api: Generate schoolId & slug
+
+' Create tenant
+api -> firestore: Create tenant document
+firestore -> api: Tenant created
+
+' Upload files
+alt Has logo or banner
+    api -> storage: Upload logo to\n/schools/{schoolId}/logo.jpg
+    storage -> api: Logo URL
+    
+    api -> storage: Upload banner to\n/schools/{schoolId}/banner.jpg
+    storage -> api: Banner URL
+    
+    api -> firestore: Update tenant with URLs
+end
+
+' Create admin account
+api -> firebase_auth: createUser(email, password)
+firebase_auth -> api: User created (userId)
+
+api -> firestore: Create user document\n{userId, schoolId, role: school_admin}
+firestore -> api: User doc created
+
+' Assign subscription
+api -> firestore: Create subscription record\n{schoolId, planId, status: trial}
+firestore -> api: Subscription created
+
+' Send welcome email
+api -> email_service: Send welcome email\n(verification + setup guide)
+email_service -> admin: Welcome email
+
+api -> browser: Registration success\n{schoolId, adminId}
+
+browser -> admin: Show success page\n"Check email for verification"
+
+== Post-Registration ==
+
+admin -> admin: Check email
+admin -> admin: Click verification link
+
+admin -> browser: Email verified
+browser -> admin: Redirect to login
+
+admin -> browser: Login with credentials
+browser -> api: POST /api/auth/login
+api -> firebase_auth: Verify credentials
+firebase_auth -> api: ID token
+api -> firestore: Get user data
+firestore -> api: User {schoolId, role}
+api -> browser: Session created
+browser -> admin: Redirect to\n/school-admin/dashboard
+
+note right of api
+  **Registration Transaction:**
+  
+  1. Validate all data
+  2. Generate unique schoolId
+  3. Create tenant doc
+  4. Upload files (if any)
+  5. Create admin auth user
+  6. Create user document
+  7. Assign subscription
+  8. Send welcome email
+  
+  **Rollback on any failure!**
+end note
+
+note right of firestore
+  **Created Documents:**
+  
+  /tenants/{schoolId}
+  - Complete school profile
+  - Subscription info
+  - Logo & banner URLs
+  
+  /users/{adminUserId}
+  - Admin profile
+  - Role: school_admin
+  - schoolId reference
+  
+  /subscriptions/{subscriptionId}
+  - Plan assignment
+  - Trial period
+  - Start/end dates
+end note
+
+@enduml
+
+@startuml Onboarding_Wizard_Structure
+
+title Onboarding Wizard UI Structure
+
+package "Onboarding Pages" {
+    class OnboardingPage {
+        +currentStep: number
+        +data: OnboardingData
+        +handleNext()
+        +handlePrev()
+    }
+    
+    class OnboardingLayout {
+        +children: ReactNode
+        +render(): JSX.Element
+    }
+}
+
+package "Context" {
+    class OnboardingContext {
+        +currentStep: number
+        +data: OnboardingData
+        +setCurrentStep(step: number)
+        +updateStepData(step, data)
+        +nextStep()
+        +prevStep()
+        +resetOnboarding()
+    }
+    
+    class OnboardingProvider {
+        +children: ReactNode
+        +value: OnboardingContext
+    }
+}
+
+package "Components" {
+    class Stepper {
+        +currentStep: number
+        +steps: Step[]
+        +render(): JSX.Element
+    }
+    
+    class Step1BasicInfo {
+        +onSubmit(data)
+        +validation: ZodSchema
+    }
+    
+    class Step2Address {
+        +onSubmit(data)
+        +provinces: Option[]
+        +cities: Option[]
+    }
+    
+    class Step3Branding {
+        +onSubmit(data)
+        +handleLogoUpload()
+        +handleBannerUpload()
+        +compressImage()
+    }
+    
+    class Step4Subscription {
+        +onSubmit(data)
+        +plans: Plan[]
+        +selectedPlan: Plan
+    }
+    
+    class Step5AdminAccount {
+        +onSubmit(data)
+        +handleComplete()
+    }
+}
+
+OnboardingLayout ..> OnboardingProvider : wraps
+OnboardingPage ..> OnboardingContext : uses
+OnboardingPage ..> Stepper : renders
+OnboardingPage ..> Step1BasicInfo : conditionally renders
+OnboardingPage ..> Step2Address : conditionally renders
+OnboardingPage ..> Step3Branding : conditionally renders
+OnboardingPage ..> Step4Subscription : conditionally renders
+OnboardingPage ..> Step5AdminAccount : conditionally renders
+
+Step1BasicInfo ..> OnboardingContext : updates
+Step2Address ..> OnboardingContext : updates
+Step3Branding ..> OnboardingContext : updates
+Step4Subscription ..> OnboardingContext : updates
+Step5AdminAccount ..> OnboardingContext : updates
+
+note right of OnboardingContext
+  **State Management:**
+  
+  interface OnboardingData {
+    step1: {
+      name, npsn, schoolType,
+      status, email, phone
+    }
+    step2: {
+      street, province, city,
+      postalCode, whatsapp
+    }
+    step3: {
+      logo: File,
+      logoPreview: string,
+      banner: File,
+      bannerPreview: string
+    }
+    step4: {
+      planId: string,
+      billingCycle: string
+    }
+    step5: {
+      adminName: string,
+      adminEmail: string,
+      adminPassword: string
+    }
+  }
+end note
+
+note bottom of Step3Branding
+  **File Upload Process:**
+  
+  1. User selects file
+  2. Validate type & size
+  3. Compress using Canvas API
+  4. Generate preview (base64)
+  5. Store File object
+  6. Upload on final submit
+end note
+
+@enduml
+
+@startuml Onboarding_Success_Paths
+
+title Onboarding User Journey & Success Paths
+
+[*] --> LandingPage
+
+LandingPage --> OnboardingStart : Click "Daftar Sekolah"
+OnboardingStart --> Step1 : Begin
+
+state "Step 1: Basic Info" as Step1 {
+    [*] --> FillForm1
+    FillForm1 --> Validate1
+    Validate1 --> Next1 : Valid
+    Validate1 --> FillForm1 : Invalid
+}
+
+Step1 --> Step2 : Next
+
+state "Step 2: Address" as Step2 {
+    [*] --> FillForm2
+    FillForm2 --> SelectProvince
+    SelectProvince --> SelectCity
+    SelectCity --> Validate2
+    Validate2 --> Next2 : Valid
+    Validate2 --> FillForm2 : Invalid
+    Next2 --> [*]
+}
+
+Step2 --> Step3 : Next
+Step2 --> Step1 : Back
+
+state "Step 3: Branding" as Step3 {
+    [*] --> UploadChoice
+    UploadChoice --> UploadLogo : Choose logo
+    UploadChoice --> Skip3 : Skip
+    UploadLogo --> CompressLogo
+    CompressLogo --> PreviewLogo
+    PreviewLogo --> UploadBanner : Optional
+    UploadBanner --> CompressBanner
+    CompressBanner --> PreviewBanner
+    PreviewBanner --> Next3
+    Skip3 --> Next3
+    Next3 --> [*]
+}
+
+Step3 --> Step4 : Next
+Step3 --> Step2 : Back
+
+state "Step 4: Subscription" as Step4 {
+    [*] --> ViewPlans
+    ViewPlans --> ComparePlans
+    ComparePlans --> SelectPlan
+    SelectPlan --> Next4
+}
+
+Step4 --> Step5 : Next
+Step4 --> Step3 : Back
+
+state "Step 5: Admin Account" as Step5 {
+    [*] --> FillAdmin
+    FillAdmin --> ValidateAdmin
+    ValidateAdmin --> FillAdmin : Invalid
+    ValidateAdmin --> ReviewSummary : Valid
+    ReviewSummary --> ConfirmSubmit
+}
+
+Step5 --> Step4 : Back
+Step5 --> Submit : Confirm
+
+Submit --> ProcessRegistration
+
+state "Process Registration" as ProcessRegistration {
+    [*] --> ValidateAllData
+    ValidateAllData --> CreateTenant
+    CreateTenant --> UploadFiles
+    UploadFiles --> CreateAdmin
+    CreateAdmin --> AssignSubscription
+    AssignSubscription --> SendEmail
+    SendEmail --> [*]
+}
+
+ProcessRegistration --> SuccessPage : Success
+ProcessRegistration --> ErrorPage : Error
+
+SuccessPage --> EmailVerification
+EmailVerification --> LoginPage : Verify email
+ErrorPage --> Step1 : Try again
+
+LoginPage --> Dashboard : Login success
+Dashboard --> [*]
+
+note right of ProcessRegistration
+  **Atomic Operation:**
+  All steps must succeed or
+  rollback to prevent partial
+  registration.
+end note
+
+note right of SuccessPage
+  **Success Metrics:**
+  - School created: ✓
+  - Admin created: ✓
+  - Email sent: ✓
+  - Subscription active: ✓
+  
+  **Next Steps for User:**
+  1. Verify email
+  2. Login
+  3. Complete setup wizard
+  4. Create first PPDB period
+end note
+
+@enduml
