@@ -15,7 +15,10 @@
     "emulator:export": "firebase emulators:export ./firebase-data",
     "emulator:import": "firebase emulators:start --import=./firebase-data",
     "firebase:deploy:rules": "firebase deploy --only firestore:rules,storage:rules",
-    "firebase:deploy:indexes": "firebase deploy --only firestore:indexes"
+    "firebase:deploy:indexes": "firebase deploy --only firestore:indexes",
+    "env:check": "node scripts/check-env.js",
+    "env:setup": "node scripts/setup-env.js",
+    "postinstall": "node scripts/check-env.js || echo 'Run npm run env:setup to configure environment'"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
