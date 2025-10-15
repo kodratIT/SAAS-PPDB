@@ -1,0 +1,44 @@
+# Auto-label PRs based on changed files
+
+'dependencies':
+  - 'package.json'
+  - 'package-lock.json'
+  - 'yarn.lock'
+
+'documentation':
+  - '**/*.md'
+  - 'docs/**/*'
+
+'frontend':
+  - 'src/app/**/*'
+  - 'src/components/**/*'
+
+'backend':
+  - 'src/app/api/**/*'
+  - 'src/lib/**/*'
+
+'firebase':
+  - 'firebase/**/*'
+  - 'src/lib/firebase/**/*'
+
+'styles':
+  - '**/*.css'
+  - 'tailwind.config.*'
+
+'config':
+  - '*.config.*'
+  - '.eslintrc.*'
+  - '.prettierrc'
+  - 'tsconfig.json'
+
+'ci/cd':
+  - '.github/**/*'
+
+'tests':
+  - 'tests/**/*'
+  - '**/*.test.*'
+  - '**/*.spec.*'
+
+'security':
+  - 'firebase/rules/**/*'
+  - '.env.example'
