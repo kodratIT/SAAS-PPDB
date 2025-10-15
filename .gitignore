@@ -52,3 +52,8 @@ serviceAccountKey.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+.idea/
+*.iml
+
+# Documentation (contains example code with placeholders)
+plan/
