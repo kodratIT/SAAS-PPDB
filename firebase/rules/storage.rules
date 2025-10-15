@@ -1,0 +1,141 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // ==================== HELPER FUNCTIONS ====================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return request.auth.token.role;
+    }
+    
+    function getUserSchoolId() {
+      return request.auth.token.schoolId;
+    }
+    
+    function isSuperAdmin() {
+      return isAuthenticated() && getUserRole() == 'super_admin';
+    }
+    
+    function isSchoolAdmin() {
+      return isAuthenticated() && getUserRole() == 'school_admin';
+    }
+    
+    function isPanitia() {
+      return isAuthenticated() && getUserRole() == 'panitia';
+    }
+    
+    function isStudent() {
+      return isAuthenticated() && getUserRole() == 'student';
+    }
+    
+    function belongsToSchool(schoolId) {
+      return isAuthenticated() && getUserSchoolId() == schoolId;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Validate file size (max 5MB)
+    function isValidSize() {
+      return request.resource.size < 5 * 1024 * 1024;
+    }
+    
+    // Validate image file
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    // Validate document file
+    function isDocument() {
+      return request.resource.contentType.matches('(image|application/pdf)/.*');
+    }
+    
+    // ==================== SCHOOL ASSETS ====================
+    
+    // School logos, covers, gallery
+    match /schools/{schoolId}/{assetType}/{fileName} {
+      allow read: if true; // Public read for school assets
+      
+      allow write: if isSuperAdmin()
+        || (isSchoolAdmin() && belongsToSchool(schoolId))
+        && isImage()
+        && isValidSize();
+    }
+    
+    // ==================== USER PROFILE PHOTOS ====================
+    
+    match /users/{userId}/profile/{fileName} {
+      allow read: if isAuthenticated();
+      
+      allow write: if (isSuperAdmin() || isOwner(userId))
+        && isImage()
+        && request.resource.size < 2 * 1024 * 1024; // Max 2MB for profile photos
+    }
+    
+    // ==================== APPLICATION DOCUMENTS ====================
+    
+    // Student application documents
+    match /applications/{schoolId}/{periodId}/{userId}/{documentType}/{fileName} {
+      // Students can upload their own documents
+      // School admin and panitia can read for verification
+      
+      allow read: if isSuperAdmin()
+        || belongsToSchool(schoolId)
+        || isOwner(userId);
+      
+      allow write: if isOwner(userId)
+        && isDocument()
+        && isValidSize();
+      
+      allow delete: if isSuperAdmin()
+        || (isSchoolAdmin() && belongsToSchool(schoolId))
+        || isOwner(userId);
+    }
+    
+    // ==================== PAYMENT PROOFS ====================
+    
+    match /payments/{schoolId}/{periodId}/{userId}/{fileName} {
+      allow read: if isSuperAdmin()
+        || belongsToSchool(schoolId)
+        || isOwner(userId);
+      
+      allow write: if isOwner(userId)
+        && isDocument()
+        && request.resource.size < 3 * 1024 * 1024; // Max 3MB
+      
+      allow delete: if isSuperAdmin()
+        || (isSchoolAdmin() && belongsToSchool(schoolId));
+    }
+    
+    // ==================== REPORTS & EXPORTS ====================
+    
+    match /reports/{schoolId}/{reportType}/{fileName} {
+      allow read: if isSuperAdmin()
+        || belongsToSchool(schoolId);
+      
+      allow write: if isSuperAdmin()
+        || (isSchoolAdmin() && belongsToSchool(schoolId));
+      
+      allow delete: if isSuperAdmin()
+        || (isSchoolAdmin() && belongsToSchool(schoolId));
+    }
+    
+    // ==================== SYSTEM FILES ====================
+    
+    match /system/{fileName} {
+      allow read: if isSuperAdmin();
+      allow write: if isSuperAdmin();
+    }
+    
+    // ==================== DEFAULT DENY ====================
+    
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
