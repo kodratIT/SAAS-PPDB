@@ -7,6 +7,11 @@ import type { UserRole } from './lib/rbac/permissions'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Skip middleware for API routes
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next()
+  }
+
   const routeConfig = getRouteConfig(pathname)
 
   if (!routeConfig || routeConfig.requireAuth === false) {

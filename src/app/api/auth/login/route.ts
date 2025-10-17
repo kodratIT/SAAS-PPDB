@@ -5,7 +5,8 @@ import { getUser, updateLastLogin } from '@/lib/firebase/collections/users'
 
 export async function POST(request: NextRequest) {
   try {
-    const { idToken } = await request.json()
+    const body = await request.json()
+    const { idToken } = body
 
     if (!idToken) {
       return NextResponse.json(
@@ -15,6 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!adminAuth) {
+      console.error('Firebase Admin not initialized')
       return NextResponse.json(
         { error: 'Authentication service unavailable' },
         { status: 500 }
