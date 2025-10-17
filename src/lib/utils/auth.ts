@@ -16,7 +16,7 @@ export interface SessionPayload {
 }
 
 export async function createSession(payload: SessionPayload): Promise<string> {
-  const token = await new SignJWT(payload)
+  const token = await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('7d')
@@ -44,7 +44,7 @@ export async function verifySession(): Promise<SessionPayload | null> {
 
   try {
     const verified = await jwtVerify(token, SECRET_KEY)
-    return verified.payload as SessionPayload
+    return verified.payload as unknown as SessionPayload
   } catch (err) {
     console.error('Session verification failed:', err)
     return null
@@ -62,7 +62,7 @@ export async function verifySessionFromRequest(
 
   try {
     const verified = await jwtVerify(token, SECRET_KEY)
-    return verified.payload as SessionPayload
+    return verified.payload as unknown as SessionPayload
   } catch (err) {
     console.error('Session verification failed:', err)
     return null
