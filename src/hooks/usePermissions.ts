@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useSession } from 'next-auth/react'
 import {
   hasPermission,
   hasAnyPermission,
@@ -12,9 +12,9 @@ import {
 } from '@/lib/rbac/permissions'
 
 export function usePermissions() {
-  const { userData } = useAuth()
+  const { data: session } = useSession()
   
-  const role = (userData?.role as UserRole) || 'student'
+  const role = (session?.user?.role as UserRole) || 'student'
 
   const permissions = useMemo(() => {
     return getRolePermissions(role)

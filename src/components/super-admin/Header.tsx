@@ -1,5 +1,6 @@
 'use client'
 
+import { useSession } from 'next-auth/react'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   DropdownMenu,
@@ -15,8 +16,10 @@ import { Bell, User, Settings, LogOut } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 export function Header() {
-  const { userData, logout } = useAuth()
+  const { data: session } = useSession()
+  const { logout } = useAuth()
   const router = useRouter()
+  const userData = session?.user
 
   const handleLogout = async () => {
     try {

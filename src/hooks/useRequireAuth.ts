@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContext'
+import { useSession } from 'next-auth/react'
 import type { UserRole } from '@/lib/rbac/permissions'
 
 interface UseRequireAuthOptions {
@@ -12,27 +12,28 @@ interface UseRequireAuthOptions {
 
 export function useRequireAuth(options: UseRequireAuthOptions = {}) {
   const { redirectTo = '/login', requiredRole } = options
-  const { user, userData, loading } = useAuth()
+  const { data: session, status } = useSession()
   const router = useRouter()
+  const loading = status === 'loading'
 
   useEffect(() => {
     if (loading) return
 
-    if (!user) {
+    if (!session) {
       router.push(redirectTo)
       return
     }
 
-    if (requiredRole && userData) {
+    if (requiredRole && session.user) {
       const allowedRoles = Array.isArray(requiredRole)
         ? requiredRole
         : [requiredRole]
 
-      if (!allowedRoles.includes(userData.role as UserRole)) {
+      if (!allowedRoles.includes(session.user.role as UserRole)) {
         router.push('/unauthorized')
       }
     }
-  }, [user, userData, loading, router, redirectTo, requiredRole])
+  }, [session, loading, router, redirectTo, requiredRole])
 
-  return { user, userData, loading }
+  return { user: session?.user, userData: session?.user, loading }
 }
