@@ -112,14 +112,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const idToken = await result.user.getIdToken()
 
+      console.log('Calling /api/auth/login...')
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
       })
 
+      console.log('Response status:', response.status)
+      console.log('Response content-type:', response.headers.get('content-type'))
+
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text()
+        console.error('Non-JSON response:', text.substring(0, 200))
+        throw new Error('Server returned non-JSON response. Check server logs.')
+      }
+
+      const data = await response.json()
+
       if (!response.ok) {
-        const data = await response.json()
         throw new Error(data.error || 'Login failed')
       }
     } catch (err: any) {
@@ -158,14 +170,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const idToken = await result.user.getIdToken()
 
+      console.log('Calling /api/auth/login (Google)...')
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
       })
 
+      console.log('Response status:', response.status)
+      
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text()
+        console.error('Non-JSON response:', text.substring(0, 200))
+        throw new Error('Server returned non-JSON response. Check server logs.')
+      }
+
+      const data = await response.json()
+
       if (!response.ok) {
-        const data = await response.json()
         throw new Error(data.error || 'Login failed')
       }
     } catch (err: any) {
