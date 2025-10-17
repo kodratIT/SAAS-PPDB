@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { useSession, signIn as nextAuthSignIn, signOut as nextAuthSignOut } from 'next-auth/react'
+import { signIn as nextAuthSignIn, signOut as nextAuthSignOut } from 'next-auth/react'
 import {
   User,
   signInWithEmailAndPassword,
@@ -39,12 +39,10 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession()
   const [user, setUser] = useState<User | null>(null)
   const [userData, setUserData] = useState<DBUser | null>(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  const loading = status === 'loading'
 
   const fetchUserData = async (uid: string): Promise<DBUser | null> => {
     try {
@@ -69,6 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setUserData(null)
       }
+
+      setLoading(false)
     })
 
     return unsubscribe
