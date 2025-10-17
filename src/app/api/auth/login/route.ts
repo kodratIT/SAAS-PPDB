@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { adminAuth } from '@/lib/firebase/admin'
+import { adminAuth, adminDb } from '@/lib/firebase/admin'
 import { createSession } from '@/lib/utils/auth'
-import { getUser, updateLastLogin } from '@/lib/firebase/collections/users'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { idToken } = body
+    const { idToken } = await request.json()
 
     if (!idToken) {
       return NextResponse.json(
@@ -16,7 +14,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (!adminAuth) {
-      console.error('Firebase Admin not initialized')
       return NextResponse.json(
         { error: 'Authentication service unavailable' },
         { status: 500 }
@@ -26,17 +23,27 @@ export async function POST(request: NextRequest) {
     const decodedToken = await adminAuth.verifyIdToken(idToken)
     const userId = decodedToken.uid
 
-    const userData = await getUser(userId)
+    // Get user from Firestore using Admin SDK
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: 'Database service unavailable' },
+        { status: 500 }
+      )
+    }
 
-    if (!userData) {
+    const userDoc = await adminDb.collection('users').doc(userId).get()
+
+    if (!userDoc.exists) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    if (userData.status !== 'active') {
+    const userData = userDoc.data()
+
+    if (userData?.status !== 'active') {
       return NextResponse.json(
         {
           error:
-            userData.status === 'suspended'
+            userData?.status === 'suspended'
               ? 'Akun Anda telah ditangguhkan'
               : 'Akun Anda tidak aktif',
         },
@@ -44,7 +51,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await updateLastLogin(userId)
+    // Update last login
+    await adminDb.collection('users').doc(userId).update({
+      lastLogin: new Date(),
+    })
 
     await createSession({
       userId,
