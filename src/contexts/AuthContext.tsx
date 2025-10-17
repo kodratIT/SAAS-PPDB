@@ -1,16 +1,14 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
+import { useSession, signIn as nextAuthSignIn, signOut as nextAuthSignOut } from 'next-auth/react'
 import {
   User,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
   sendPasswordResetEmail,
   sendEmailVerification,
-  GoogleAuthProvider,
-  signInWithPopup,
+  onAuthStateChanged,
 } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase/config'
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore'
@@ -41,10 +39,12 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession()
   const [user, setUser] = useState<User | null>(null)
   const [userData, setUserData] = useState<DBUser | null>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const loading = status === 'loading'
 
   const fetchUserData = async (uid: string): Promise<DBUser | null> => {
     try {
@@ -69,8 +69,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setUserData(null)
       }
-
-      setLoading(false)
     })
 
     return unsubscribe
@@ -109,30 +107,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setError(null)
       const result = await signInWithEmailAndPassword(auth, email, password)
-
       const idToken = await result.user.getIdToken()
 
-      console.log('Calling /api/auth/login...')
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
+      const res = await nextAuthSignIn('firebase', {
+        idToken,
+        redirect: false,
       })
 
-      console.log('Response status:', response.status)
-      console.log('Response content-type:', response.headers.get('content-type'))
-
-      const contentType = response.headers.get('content-type')
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text()
-        console.error('Non-JSON response:', text.substring(0, 200))
-        throw new Error('Server returned non-JSON response. Check server logs.')
-      }
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed')
+      if (res?.error) {
+        throw new Error(res.error)
       }
     } catch (err: any) {
       console.error('Login error:', err)
@@ -144,52 +127,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithGoogle = async () => {
     try {
       setError(null)
-      const provider = new GoogleAuthProvider()
-      const result = await signInWithPopup(auth, provider)
-
-      const userDoc = await getDoc(doc(db, 'users', result.user.uid))
-
-      if (!userDoc.exists()) {
-        await setDoc(doc(db, 'users', result.user.uid), {
-          email: result.user.email,
-          name: result.user.displayName || result.user.email?.split('@')[0],
-          photoURL: result.user.photoURL,
-          role: 'student',
-          status: 'active',
-          twoFactorEnabled: false,
-          preferences: {
-            emailNotif: true,
-            smsNotif: false,
-            pushNotif: true,
-            language: 'id',
-          },
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        })
-      }
-
-      const idToken = await result.user.getIdToken()
-
-      console.log('Calling /api/auth/login (Google)...')
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
+      const result = await nextAuthSignIn('google', {
+        callbackUrl: '/dashboard',
+        redirect: false,
       })
 
-      console.log('Response status:', response.status)
-      
-      const contentType = response.headers.get('content-type')
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text()
-        console.error('Non-JSON response:', text.substring(0, 200))
-        throw new Error('Server returned non-JSON response. Check server logs.')
-      }
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed')
+      if (result?.error) {
+        throw new Error(result.error)
       }
     } catch (err: any) {
       console.error('Google login error:', err)
@@ -201,12 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       setError(null)
-
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-      })
-
-      await signOut(auth)
+      await nextAuthSignOut({ redirect: false })
     } catch (err: any) {
       console.error('Logout error:', err)
       setError(err.message)
