@@ -109,8 +109,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await signInWithEmailAndPassword(auth, email, password)
       const idToken = await result.user.getIdToken()
 
+      const userDoc = await getDoc(doc(db, 'users', result.user.uid))
+      if (!userDoc.exists()) {
+        throw new Error('User not found')
+      }
+
+      const userData = userDoc.data()
+      if (userData.status !== 'active') {
+        throw new Error(
+          userData.status === 'suspended'
+            ? 'Akun Anda telah ditangguhkan'
+            : 'Akun Anda tidak aktif'
+        )
+      }
+
+      await setDoc(
+        doc(db, 'users', result.user.uid),
+        { lastLogin: Timestamp.now() },
+        { merge: true }
+      )
+
       const res = await nextAuthSignIn('firebase', {
         idToken,
+        userId: result.user.uid,
+        email: userData.email,
+        name: userData.name,
+        role: userData.role,
+        photoURL: userData.photoURL || '',
         redirect: false,
       })
 

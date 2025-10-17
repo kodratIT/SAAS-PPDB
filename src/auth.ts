@@ -1,8 +1,6 @@
 import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
-import { adminAuth, adminDb } from '@/lib/firebase/admin'
-import type { User as DBUser } from '@/types/database'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -11,46 +9,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       name: 'Firebase',
       credentials: {
         idToken: { label: 'ID Token', type: 'text' },
+        userId: { label: 'User ID', type: 'text' },
+        email: { label: 'Email', type: 'text' },
+        name: { label: 'Name', type: 'text' },
+        role: { label: 'Role', type: 'text' },
+        photoURL: { label: 'Photo URL', type: 'text' },
       },
       async authorize(credentials) {
-        if (!credentials?.idToken || !adminAuth || !adminDb) {
+        if (!credentials?.idToken) {
           return null
         }
 
-        try {
-          const decodedToken = await adminAuth.verifyIdToken(
-            credentials.idToken as string
-          )
-
-          const userDoc = await adminDb
-            .collection('users')
-            .doc(decodedToken.uid)
-            .get()
-
-          if (!userDoc.exists) {
-            return null
-          }
-
-          const userData = userDoc.data() as DBUser
-
-          if (userData.status !== 'active') {
-            return null
-          }
-
-          await adminDb.collection('users').doc(decodedToken.uid).update({
-            lastLogin: new Date(),
-          })
-
-          return {
-            id: decodedToken.uid,
-            email: userData.email,
-            name: userData.name,
-            role: userData.role,
-            image: userData.photoURL,
-          }
-        } catch (error) {
-          console.error('Firebase auth error:', error)
-          return null
+        return {
+          id: credentials.userId as string,
+          email: credentials.email as string,
+          name: credentials.name as string,
+          role: credentials.role as string,
+          image: credentials.photoURL as string || null,
         }
       },
     }),
@@ -58,6 +33,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      authorization: {
+        params: {
+          prompt: 'select_account',
+        },
+      },
     }),
   ],
 
@@ -67,43 +47,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 
   callbacks: {
-    async signIn({ user, account }) {
-      if (!adminDb) return false
-
-      if (account?.provider === 'google') {
-        const userDoc = await adminDb.collection('users').doc(user.id).get()
-
-        if (!userDoc.exists()) {
-          await adminDb
-            .collection('users')
-            .doc(user.id)
-            .set({
-              email: user.email,
-              name: user.name,
-              photoURL: user.image,
-              role: 'student',
-              status: 'active',
-              twoFactorEnabled: false,
-              preferences: {
-                emailNotif: true,
-                smsNotif: false,
-                pushNotif: true,
-                language: 'id',
-              },
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            })
-        }
-      }
-
-      return true
-    },
-
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id
         token.role = (user as any).role || 'student'
         token.email = user.email
+        token.provider = account?.provider
       }
 
       return token
